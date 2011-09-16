@@ -11,6 +11,7 @@ object BuildSettings {
         version := buildVersion,
         scalaVersion := buildScalaVersion,
         scalacOptions += "-deprecation",
+        fork in test := true,
         resolvers := Seq(Resolvers.scalaToolsRepo, Resolvers.jbossRepo,
                          Resolvers.akkaRepo, Resolvers.sonatypeRepo))
 
