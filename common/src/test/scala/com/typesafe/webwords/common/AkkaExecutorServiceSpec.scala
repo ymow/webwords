@@ -1,5 +1,6 @@
 package com.typesafe.webwords.common
 
+import scala.collection.JavaConverters._
 import java.util.concurrent.atomic.AtomicBoolean
 import org.scalatest.matchers._
 import org.scalatest._
@@ -50,20 +51,29 @@ class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
         }
         // stop new tasks from being submitted and
         // cancel existing ones when possible
-        executor.shutdownNow()
+        val notRun = executor.shutdownNow().asScala
         executor.isShutdown() should be(true)
         executor.awaitTermination(60, TimeUnit.SECONDS)
         executor.isTerminated() should be(true)
 
-        val numberDone = tasks.foldLeft(0)({ (sofar, t) =>
+        val numberRun = tasks.foldLeft(0)({ (sofar, t) =>
             if (t.done)
                 sofar + 1
             else
                 sofar
         })
-        // No real guarantees here, shutdownNow may have
-        // managed to cancel some of them but it doesn't
-        // have to.
-        numberDone should not be (numberOfTasks)
+
+        val numberNotRun = notRun.size
+
+        // a little song and dance to get nice output on failure
+        def formatEquation(x: Int, y: Int, z: Int) =
+            "%d+%d=%d".format(x, y, z)
+        val expected = formatEquation(numberRun, numberOfTasks - numberRun, numberOfTasks)
+        formatEquation(numberRun, numberNotRun, numberOfTasks) should be(expected)
+
+        // this is not strictly guaranteed but we should make numberOfTasks
+        // high enough that it always happens in the test or else we aren't
+        // getting good coverage.
+        numberNotRun should not be (0)
     }
 }
