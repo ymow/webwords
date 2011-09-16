@@ -44,6 +44,9 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
     private case class AwaitTermination(timeoutInMs: Long) extends ExecutorRequest
     private case object GetStatus extends ExecutorRequest
     private case class Completed(task: Task, canceled: Boolean) extends ExecutorRequest
+    private case object KeepAlive extends ExecutorRequest
+    private case object AllowDeath extends ExecutorRequest
+    private case object MaybeDie extends ExecutorRequest
 
     // replies
     private sealed trait ExecutorReply
@@ -59,6 +62,7 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
     private case class Task(future: Future[ExecutorReplyToExecute], runnable: Runnable)
 
     private class ExecutorActor(cancelRequested: AtomicBoolean) extends Actor {
+        private var keepAlives = 0
         // Tasks in flight
         private var pending: Set[Task] = Set.empty
         // are we shut down
@@ -80,6 +84,15 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
         override def receive = {
             case request: ExecutorRequest =>
                 request match {
+                    case KeepAlive =>
+                        keepAlives += 1
+                    case AllowDeath =>
+                        keepAlives -= 1
+                        self ! MaybeDie
+                    case MaybeDie =>
+                        if (keepAlives == 0 && isTerminated) {
+                            self.stop
+                        }
                     case Execute(runnable) =>
                         if (cancelRequested.get) {
                             canceled = canceled.enqueue(runnable)
@@ -123,11 +136,9 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                                 l.complete(Right(terminationAwaitedReply))
                             }
                             notifyOnTerminated = Nil
-                            // commit suicide (by sending a poison pill, so only after we
-                            // process anything still in our mailbox - notably if there's
-                            // an AwaitTermination there we want to reply to it, not leave it
-                            // to time out)
-                            self ! PoisonPill
+                            // queue killing the actor if nobody has us kept alive.
+                            // there may still be messages we need to handle.
+                            self ! MaybeDie
                         }
                     case GetStatus =>
                         self.tryReply(Status(shutdown, isTerminated))
@@ -253,6 +264,22 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
         }
     }
 
+    // this lets us do a series of requests without fear of
+    // the actor stopping itself in between them. It is still
+    // possible that the actor will be stopped for all of them.
+    private def withActorAlive[T](ifStopped: T)(body: => T): T = {
+        actor.tryTell(KeepAlive)
+        try {
+            if (actor.isRunning) {
+                body
+            } else {
+                ifStopped
+            }
+        } finally {
+            actor.tryTell(AllowDeath)
+        }
+    }
+
     private def awaitTerminationWithCanceled(timeout: Long, unit: TimeUnit): (Boolean, Seq[Runnable]) = {
         akka.event.EventHandler.info(actor, "awaitTerminationWithCanceled() method")
         if (outerTerminated.get) {
@@ -326,22 +353,24 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
     }
 
     override def shutdownNow: java.util.List[Runnable] = {
-        // If we send a message, it won't shutdown "now",
-        // it will shutdown after the executor actor drains
-        // a potentially long queue including Execute requests.
-        // So we have this shared state boolean to let us tell
-        // the actor to start canceling any runnables it hasn't
-        // run yet, including those in its queue.
-        cancelRequested.set(true)
+        withActorAlive(java.util.Collections.emptyList[Runnable]) {
+            // If we send a message, it won't shutdown "now",
+            // it will shutdown after the executor actor drains
+            // a potentially long queue including Execute requests.
+            // So we have this shared state boolean to let us tell
+            // the actor to start canceling any runnables it hasn't
+            // run yet, including those in its queue.
+            cancelRequested.set(true)
 
-        // shutdown sends a Shutdown message and waits for it to
-        // return, so we should know the queue was drained when
-        // this returns
-        shutdown
+            // shutdown sends a Shutdown message and waits for it to
+            // return, so we should know the queue was drained when
+            // this returns
+            shutdown
 
-        // Now we have to wait for termination so that any tasks
-        // that will self-cancel when they dispatch have a chance
-        // to do so
-        awaitTerminationWithCanceled(20, TimeUnit.SECONDS)._2.asJava
+            // Now we have to wait for termination so that any tasks
+            // that will self-cancel when they dispatch have a chance
+            // to do so
+            awaitTerminationWithCanceled(20, TimeUnit.SECONDS)._2.asJava
+        }
     }
 }
