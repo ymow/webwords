@@ -93,7 +93,6 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                         })
                         self.channel.replyWith(f)
                     case Completed(task) =>
-                        akka.event.EventHandler.info(self, "Got a Completed, mailbox=" + self.dispatcher.mailboxSize(self))
                         removePending(task)
 
                         if (shutdown && pending.isEmpty) {
