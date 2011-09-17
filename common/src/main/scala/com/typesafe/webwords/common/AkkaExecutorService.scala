@@ -34,6 +34,11 @@ import akka.dispatch.MessageInvocation
  * There is a ticket to solve this upstream:
  * https://www.assembla.com/spaces/akka/tickets/1208
  * so this whole file could get deleted later on.
+ *
+ * Also, this whole thing is just an optimization to
+ * reduce the number of threads in the app, which probably
+ * is not even important. You could use Executors.newCachedThreadPool
+ * instead...
  */
 class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends AbstractExecutorService {
     private final val log = akka.event.EventHandler
