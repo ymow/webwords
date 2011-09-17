@@ -6,6 +6,7 @@ import org.scalatest.matchers._
 import org.scalatest._
 import akka.actor._
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.RejectedExecutionException
 
 class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
     behavior of "AkkaExecutorService"
@@ -14,7 +15,8 @@ class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
         private val _done = new AtomicBoolean(false)
         def done = _done.get()
         override def run() = {
-            Thread.sleep(50)
+            // simulate taking some time
+            Thread.sleep(15)
             _done.set(true)
         }
         override def toString = "TestTask(" + id + ")"
@@ -86,5 +88,31 @@ class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
             // getting good coverage.
             numberNotRun should not be (0)
         }
+    }
+
+    it should "reject tasks after shutdown" in {
+        val executor = new AkkaExecutorService()
+        val tasks = for (i <- 1 to 10)
+            yield new TestTask(i)
+        tasks foreach { t =>
+            t.done should be(false)
+            executor.execute(t)
+        }
+        // stop new tasks from being submitted
+        executor.shutdown()
+
+        val reject = new TestTask(11)
+        evaluating {
+            executor.execute(reject)
+        } should produce[RejectedExecutionException]
+
+        executor.awaitTermination(60, TimeUnit.SECONDS)
+        executor.isTerminated() should be(true)
+
+        tasks foreach { t =>
+            t.done should be(true)
+        }
+
+        reject.done should be(false)
     }
 }
