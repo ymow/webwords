@@ -49,28 +49,24 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
     private case object Shutdown extends ExecutorRequest
     private case class AwaitTermination(timeoutInMs: Long) extends ExecutorRequest
     private case object GetStatus extends ExecutorRequest
-    private case class Completed(task: Task, canceled: Boolean) extends ExecutorRequest
     private case object KeepAlive extends ExecutorRequest
     private case object AllowDeath extends ExecutorRequest
+
+    // we send these two to ourselves
+    private case class Completed(runnable: Runnable, canceled: Boolean) extends ExecutorRequest
     private case object MaybeDie extends ExecutorRequest
 
     // replies
     private sealed trait ExecutorReply
     private case class Status(shutdown: Boolean, terminated: Boolean) extends ExecutorReply
     private case class TerminationAwaited(status: Status, runnables: Seq[Runnable]) extends ExecutorReply
-    private sealed trait ExecutorReplyToExecute extends ExecutorReply {
-        val command: Runnable
-    }
-    private case class Executed(override val command: Runnable) extends ExecutorReplyToExecute
-    private case class Canceled(override val command: Runnable) extends ExecutorReplyToExecute
-    private case class Rejected(override val command: Runnable) extends ExecutorReplyToExecute
 
-    private case class Task(future: Future[ExecutorReplyToExecute], runnable: Runnable)
+    private case class Task(future: Future[Completed], runnable: Runnable)
 
     private class ExecutorActor(cancelRequested: AtomicBoolean) extends Actor {
         private var keepAlives = 0
         // Tasks in flight
-        private var pending: Set[Task] = Set.empty
+        private var pending: Map[Runnable, Task] = Map.empty
         // are we shut down
         private var shutdown = false
         // futures to complete when we are terminated
@@ -101,12 +97,14 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
 
         private def addPending(task: Task) = {
             require(!shutdown)
-            pending += task
+            pending += (task.runnable -> task)
         }
 
         private def removePending(task: Task) = {
-            pending -= task
+            pending -= task.runnable
         }
+
+        private def findPending(runnable: Runnable) = pending.get(runnable)
 
         override def receive = {
             case request: ExecutorRequest =>
@@ -123,41 +121,30 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                             stopActorNotifyingMailbox(self)
                         }
                     case Execute(runnable) =>
+                        require(!shutdown) // it isn't allowed to send Execute after Shutdown
                         if (cancelRequested.get) {
                             canceled = canceled.enqueue(runnable)
-                            self.tryReply(Canceled(runnable))
-                        } else if (shutdown) {
-                            self.tryReply(Rejected(runnable))
                         } else {
-                            val f = Future[ExecutorReplyToExecute]({
-                                if (cancelRequested.get) {
-                                    Canceled(runnable)
+                            val f = Future[Completed]({
+                                val c = if (cancelRequested.get) {
+                                    Completed(runnable, true)
                                 } else {
                                     runnable.run()
-                                    Executed(runnable)
+                                    Completed(runnable, false)
                                 }
+                                // we both send ourselves the Completed as a notification,
+                                // and store it in the future for later use
+                                self ! c
+                                c
                             })
                             val task = Task(f, runnable)
                             addPending(task)
-                            // notify ourselves when the task is finished
-                            f.onComplete({ f =>
-                                val wasCanceled = f.result map {
-                                    _ match {
-                                        case c: Canceled => true
-                                        case _ => false
-                                    }
-                                } getOrElse (false)
-                                // CAUTION onComplete handler is in another thread so
-                                // we just send a message to ourselves here to avoid
-                                // trying to do anything from the other thread
-                                self ! Completed(task, wasCanceled)
-                            })
-                            self.channel.replyWith(f)
                         }
-                    case Completed(task, wasCanceled) =>
+                    case Completed(runnable, wasCanceled) =>
+                        val task = findPending(runnable).get
                         removePending(task)
                         if (wasCanceled) {
-                            canceled = canceled.enqueue(task.runnable)
+                            canceled = canceled.enqueue(runnable)
                         }
                         if (shutdown && pending.isEmpty) {
                             notifyOnTerminated foreach { l =>
@@ -208,8 +195,8 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
 
             val start = System.currentTimeMillis()
             var remainingTimeMs = timeoutInMs
-            for (p <- pending) {
-                p.future.await(Duration(remainingTimeMs, TimeUnit.MILLISECONDS))
+            for (task <- pending.values) {
+                task.future.await(Duration(remainingTimeMs, TimeUnit.MILLISECONDS))
 
                 val elapsed = System.currentTimeMillis() - start
                 remainingTimeMs = timeoutInMs - elapsed
