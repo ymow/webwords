@@ -229,19 +229,11 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
                 self.channel.replyWith(f)
             }
         }
-
-        override def preStart = {
-            log.debug(self, "Starting up executor actor")
-        }
-        override def postStop = {
-            log.debug(self, "Shutting down executor actor")
-            require(notifyOnTerminated.isEmpty)
-            require(pending.isEmpty)
-        }
     }
 
     private val cancelRequested = new AtomicBoolean(false)
     private val actor = Actor.actorOf(new ExecutorActor(cancelRequested)).start
+    // true if we're rejecting new tasks (i.e. shut down)
     private val rejecting = new AtomicBoolean(false)
 
     private def tryAskWithTimeout(message: Any, timeoutMs: Long = Actor.defaultTimeout.duration.toMillis): CompletableFuture[Any] = {
@@ -254,8 +246,7 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
         actor ! Execute(command)
     }
 
-    private def handleStatusFuture(f: Future[Any], duration: Option[Duration] = None): Status = {
-        val start = System.currentTimeMillis()
+    private def blockForStatus(f: Future[Any], duration: Option[Duration] = None): Status = {
         try {
             // Wait for status reply to arrive. await will throw a timeout exception
             // but not the exception contained in the future.
@@ -283,15 +274,17 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
                     // if actor isn't running, we're as shutdown and terminated as we're getting
                     Status(true, true)
                 }
-        } finally {
-            val end = System.currentTimeMillis()
-            if ((end - start) > 2) {
-                log.debug(actor, "****** waiting for status took " + (end - start) + "ms")
-            }
         }
     }
 
-    private def askStatus = handleStatusFuture(tryAsk(actor, GetStatus))
+    private def asStatusFuture(f: Future[Any]): Future[Status] = {
+        f map { v =>
+            v match {
+                case TerminationAwaited(status, canceled) =>
+                    status
+            }
+        }
+    }
 
     override def awaitTermination(timeout: Long, unit: TimeUnit): Boolean = {
         log.debug(actor, "outer awaitTermination() method")
@@ -303,15 +296,9 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
 
         val timeoutMs = unit.toMillis(timeout)
         val f = tryAskWithTimeout(AwaitTermination(timeoutMs), timeoutMs)
-        val statusFuture = f map { v =>
-            v match {
-                case TerminationAwaited(status, canceled) =>
-                    status
-            }
-        }
 
         // block on a reply to see if we're terminated
-        handleStatusFuture(statusFuture, Some(Duration(timeout, unit))).terminated
+        blockForStatus(asStatusFuture(f), Some(Duration(timeout, unit))).terminated
     }
 
     override def isShutdown: Boolean = {
@@ -321,7 +308,7 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
 
     override def isTerminated: Boolean = {
         log.debug(actor, "isTerminated() method")
-        rejecting.get && askStatus.terminated
+        rejecting.get && blockForStatus(tryAsk(actor, GetStatus)).terminated
     }
 
     override def shutdown = {
@@ -344,15 +331,9 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
         cancelRequested.set(true)
 
         val f = tryAskWithTimeout(ShutdownNow, 20 * 1000)
-        val statusFuture = f map { v =>
-            v match {
-                case TerminationAwaited(status, canceled) =>
-                    status
-            }
-        }
 
         // block on a reply to see if we're terminated
-        val status = handleStatusFuture(statusFuture)
+        val status = blockForStatus(asStatusFuture(f))
 
         // extract list of canceled runnables from the reply
         val canceled = if (f.result.isDefined) {
