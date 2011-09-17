@@ -17,6 +17,7 @@ class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
             Thread.sleep(50)
             _done.set(true)
         }
+        override def toString = "TestTask(" + id + ")"
     }
 
     private def repeat(n: Int)(body: => Unit) = {
@@ -51,7 +52,7 @@ class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
             val executor = new AkkaExecutorService()
             // need lots of tasks because we're testing that
             // we cancel them before we run all of them
-            val numberOfTasks = 2000
+            val numberOfTasks = 1000
             val tasks = for (i <- 1 to numberOfTasks)
                 yield new TestTask(i)
             tasks foreach { t =>

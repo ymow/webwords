@@ -16,27 +16,26 @@ import akka.util.Duration
 import akka.dispatch.FutureTimeoutException
 import akka.dispatch.CompletableFuture
 import akka.dispatch.DefaultCompletableFuture
+import akka.dispatch.MessageQueue
+import akka.dispatch.MessageInvocation
 
 /**
  * The idea here is to use Akka's thread pool to run Runnables,
- * rather than creating a new separate one.
+ * rather than creating a new separate one. An ExecutorService
+ * implementation is delegated to an ExecutorActor
+ * which in turn has a pool of actors used to run tasks.
  *
  * We could also cheat and create a class in the Akka package that
  * accesses private field ExecutorBasedEventDrivenDispatcher.executorService,
  * but that seems kind of evil, though now that I see this file is so
- * large maybe it was a better idea.
+ * large maybe it was a better idea. There is a problem with that approach
+ * which is no way to awaitTermination().
  *
- * Akka 2.0 has a better way so in 2.0 this class should disappear.
- *
- * The ExecutorService implementation is delegated to an ExecutorActor
- * which in turn has a pool of actors used to run tasks.
+ * There is a ticket to solve this upstream:
+ * https://www.assembla.com/spaces/akka/tickets/1208
+ * so this whole file could get deleted later on.
  */
 class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends AbstractExecutorService {
-    // we track this state on the "outside" of the actor to avoid some complexity
-    // in trying to talk to the actor when it might be stopped.
-    private val outerShutdown = new AtomicBoolean(false)
-    private val outerTerminated = new AtomicBoolean(false)
-
     // requests
     private sealed trait ExecutorRequest
     private case class Execute(command: Runnable) extends ExecutorRequest
@@ -72,6 +71,27 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
         // runnables that we canceled with shutdownNow
         private var canceled = Queue.empty[Runnable]
 
+        private var completedCountToLog = 0
+        private var executeCountToLog = 0
+        private def logRequest(request: ExecutorRequest) = {
+            request match {
+                case c: Completed =>
+                    completedCountToLog += 1
+                case e: Execute =>
+                    executeCountToLog += 1
+                case _ =>
+                    if (completedCountToLog > 0) {
+                        akka.event.EventHandler.info(self, "  request=Completed*" + completedCountToLog)
+                        completedCountToLog = 0
+                    }
+                    if (executeCountToLog > 0) {
+                        akka.event.EventHandler.info(self, "  request=Execute*" + executeCountToLog)
+                        executeCountToLog = 0
+                    }
+                    akka.event.EventHandler.info(self, "  request=" + request)
+            }
+        }
+
         private def addPending(task: Task) = {
             require(!shutdown)
             pending += task
@@ -83,6 +103,8 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
 
         override def receive = {
             case request: ExecutorRequest =>
+                logRequest(request)
+
                 request match {
                     case KeepAlive =>
                         keepAlives += 1
@@ -91,7 +113,7 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                         self ! MaybeDie
                     case MaybeDie =>
                         if (keepAlives == 0 && isTerminated) {
-                            self.stop
+                            stopActorNotifyingMailbox(self)
                         }
                     case Execute(runnable) =>
                         if (cancelRequested.get) {
@@ -209,11 +231,13 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
 
     private val cancelRequested = new AtomicBoolean(false)
     private val actor = Actor.actorOf(new ExecutorActor(cancelRequested)).start
+    private val rejecting = new AtomicBoolean(false)
 
     private def tryAsk(message: Any): CompletableFuture[Any] = {
         // "?" will throw by default on a stopped actor; we want to put an exception
         // in the future instead to avoid special cases
         try {
+            akka.event.EventHandler.info(actor, "Sending to actor with isRunning=" + actor.isRunning + " message=" + message)
             actor ? message
         } catch {
             case e: ActorInitializationException =>
@@ -225,14 +249,15 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
     }
 
     override def execute(command: Runnable): Unit = {
-        if (outerShutdown.get || cancelRequested.get) {
+        if (rejecting.get)
             throw new RejectedExecutionException("Executor service has been shut down")
-        }
         actor ! Execute(command)
     }
 
-    private def handleStatusFuture(f: Future[Any], duration: Option[Duration] = None): Unit = {
+    private def handleStatusFuture(f: Future[Any], duration: Option[Duration] = None): Status = {
+        val start = System.currentTimeMillis()
         try {
+
             // Wait for status reply to arrive. await will throw a timeout exception
             // but not the exception contained in the future.
             if (duration.isDefined)
@@ -248,21 +273,26 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
             f.get match {
                 case status: Status =>
                     akka.event.EventHandler.info(actor, "status=" + status)
-                    if (status.shutdown)
-                        outerShutdown.set(true)
-                    if (status.terminated)
-                        outerTerminated.set(true)
+                    status
             }
         } catch {
             case e: Throwable =>
                 akka.event.EventHandler.info(actor, "status future threw, actor.isRunning=" + actor.isRunning)
-                // If exception is due to actor not running, then shut down
-                if (!actor.isRunning) {
-                    outerShutdown.set(true)
-                    outerTerminated.set(true)
+                if (actor.isRunning) {
+                    Status(rejecting.get, false)
+                } else {
+                    // if actor isn't running, we're as shutdown and terminated as we're getting
+                    Status(true, true)
                 }
+        } finally {
+            val end = System.currentTimeMillis()
+            if ((end - start) > 2) {
+                akka.event.EventHandler.info(actor, "****** waiting for status took " + (end - start) + "ms")
+            }
         }
     }
+
+    private def askStatus = handleStatusFuture(tryAsk(GetStatus))
 
     // this lets us do a series of requests without fear of
     // the actor stopping itself in between them. It is still
@@ -282,35 +312,34 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
 
     private def awaitTerminationWithCanceled(timeout: Long, unit: TimeUnit): (Boolean, Seq[Runnable]) = {
         akka.event.EventHandler.info(actor, "awaitTerminationWithCanceled() method")
-        if (outerTerminated.get) {
-            akka.event.EventHandler.info(actor, "already terminated")
-            (true, Nil)
-        } else {
-            akka.event.EventHandler.info(actor, "sending AwaitTermination")
 
-            val f = tryAsk(AwaitTermination(unit.toMillis(timeout)))
-            val statusFuture = f map { v =>
-                v match {
-                    case TerminationAwaited(status, canceled) =>
-                        status
-                }
+        if (!rejecting.get)
+            throw new IllegalStateException("Have to shutdown() before you awaitTermination()")
+
+        akka.event.EventHandler.info(actor, "sending AwaitTermination")
+
+        val f = tryAsk(AwaitTermination(unit.toMillis(timeout)))
+        val statusFuture = f map { v =>
+            v match {
+                case TerminationAwaited(status, canceled) =>
+                    status
             }
-
-            // block on a reply, setting outerTerminated from it
-            handleStatusFuture(statusFuture, Some(Duration(timeout, unit)))
-
-            // extract list of canceled runnables from the reply
-            val canceled = if (f.result.isDefined) {
-                f.result.get match {
-                    case TerminationAwaited(status, canceled) =>
-                        canceled
-                }
-            } else {
-                Nil
-            }
-
-            (outerTerminated.get, canceled)
         }
+
+        // block on a reply to see if we're terminated
+        val status = handleStatusFuture(statusFuture, Some(Duration(timeout, unit)))
+
+        // extract list of canceled runnables from the reply
+        val canceled = if (f.result.isDefined) {
+            f.result.get match {
+                case TerminationAwaited(status, canceled) =>
+                    canceled
+            }
+        } else {
+            Nil
+        }
+
+        (status.terminated, canceled)
     }
 
     override def awaitTermination(timeout: Long, unit: TimeUnit): Boolean = {
@@ -319,57 +348,43 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
     }
 
     override def isShutdown: Boolean = {
-        akka.event.EventHandler.info(actor, "isShutdown() method, outerShutdown=" + outerShutdown.get)
-        if (outerShutdown.get) {
-            true
-        } else {
-            val f = tryAsk(GetStatus)
-            handleStatusFuture(f)
-            akka.event.EventHandler.info(actor, "isShutdown() method end, outerShutdown=" + outerShutdown.get)
-            outerShutdown.get
-        }
+        akka.event.EventHandler.info(actor, "isShutdown() method, rejecting=" + rejecting.get)
+        rejecting.get
     }
 
     override def isTerminated: Boolean = {
-        akka.event.EventHandler.info(actor, "isTerminated() method, outerTerminated=" + outerTerminated.get)
-        if (outerTerminated.get) {
-            true
-        } else {
-            val f = tryAsk(GetStatus)
-            handleStatusFuture(f)
-            akka.event.EventHandler.info(actor, "isTerminated() method end, outerTerminated=" + outerTerminated.get)
-            outerTerminated.get
-        }
+        akka.event.EventHandler.info(actor, "isTerminated() method")
+        rejecting.get && askStatus.terminated
     }
 
     override def shutdown = {
-        if (outerShutdown.get) {
-            // nothing to do
-        } else {
-            val f = tryAsk(Shutdown)
-            handleStatusFuture(f)
-            require(outerShutdown.get)
+        if (!rejecting.getAndSet(true)) {
+            actor.tryTell(Shutdown)
         }
     }
 
     override def shutdownNow: java.util.List[Runnable] = {
+        val needShutdownMessage = !rejecting.getAndSet(true)
+
+        // If we send a message, it won't shutdown "now",
+        // it will shutdown after the executor actor drains
+        // a potentially long queue including Execute requests.
+        // So we have this shared state boolean to let us tell
+        // the actor to start canceling any runnables it hasn't
+        // run yet, including those in its queue.
+        cancelRequested.set(true)
+
         withActorAlive(java.util.Collections.emptyList[Runnable]) {
-            // If we send a message, it won't shutdown "now",
-            // it will shutdown after the executor actor drains
-            // a potentially long queue including Execute requests.
-            // So we have this shared state boolean to let us tell
-            // the actor to start canceling any runnables it hasn't
-            // run yet, including those in its queue.
-            cancelRequested.set(true)
+            if (needShutdownMessage) {
+                actor.tryTell(Shutdown)
+            }
 
-            // shutdown sends a Shutdown message and waits for it to
-            // return, so we should know the queue was drained when
-            // this returns
-            shutdown
+            // the actor may still have a bunch of runnables in its queue,
+            // or other messages. There may also be tasks that the
+            // actor has already spawned, that will self-cancel and
+            // then report themselves as canceled back to the actor.
+            // We need to wait for all this stuff to wind down.
 
-            // Now we have to wait for termination so that any tasks
-            // that will self-cancel when they dispatch have a chance
-            // to do so
             awaitTerminationWithCanceled(20, TimeUnit.SECONDS)._2.asJava
         }
     }
