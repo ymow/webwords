@@ -48,7 +48,7 @@ object URLFetcher {
     // and connection pool associated with it, it's supposed to
     // be shared among lots of requests, not per-http-request
     private def makeClient(implicit dispatcher: MessageDispatcher) = {
-        val executor = new AkkaExecutorService()(dispatcher)
+        val executor = new AkkaExecutorService(maxThreads = 8)(dispatcher)
 
         val builder = new AsyncHttpClientConfig.Builder()
         val config = builder.setMaximumConnectionsTotal(1000)
