@@ -129,7 +129,9 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                                 // and store it in the future for later use
                                 self ! c
                                 c
-                            })
+                            },
+                                // Infinite timeout is needed to match expected ExecutorService semantics
+                                Int.MaxValue)
                             val task = Task(f, runnable)
                             addPending(task)
                         }

@@ -11,12 +11,12 @@ import java.util.concurrent.RejectedExecutionException
 class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
     behavior of "AkkaExecutorService"
 
-    private class TestTask(val id: Int) extends Runnable {
+    private class TestTask(val id: Int, val sleepTimeMs: Int = 15) extends Runnable {
         private val _done = new AtomicBoolean(false)
         def done = _done.get()
         override def run() = {
             // simulate taking some time
-            Thread.sleep(15)
+            Thread.sleep(sleepTimeMs)
             _done.set(true)
         }
         override def toString = "TestTask(" + id + ")"
@@ -114,5 +114,27 @@ class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
         }
 
         reject.done should be(false)
+    }
+
+    // this test sort of inherently takes forever, unfortunately
+    it should "wait for tasks that take longer than Akka timeout" in {
+        val executor = new AkkaExecutorService()
+        val tasks = for (i <- 1 to 5)
+            yield new TestTask(i, 15 * 1000)
+        tasks foreach { t =>
+            t.done should be(false)
+            executor.execute(t)
+        }
+
+        executor.shutdown()
+        executor.isShutdown() should be(true)
+        // we're testing that when awaitTermination returns, the
+        // tasks are done.
+        executor.awaitTermination(60, TimeUnit.SECONDS)
+        executor.isTerminated() should be(true)
+
+        tasks foreach { t =>
+            t.done should be(true)
+        }
     }
 }
