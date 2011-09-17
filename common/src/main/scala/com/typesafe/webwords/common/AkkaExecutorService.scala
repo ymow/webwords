@@ -40,7 +40,7 @@ import akka.dispatch.MessageInvocation
  * is not even important. You could use Executors.newCachedThreadPool
  * instead...
  */
-class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends AbstractExecutorService {
+class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit val dispatcher: MessageDispatcher) extends AbstractExecutorService {
     private final val log = akka.event.EventHandler
 
     // requests
@@ -63,9 +63,12 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
     private case class Task(future: Future[Completed], runnable: Runnable)
 
     private class ExecutorActor(cancelRequested: AtomicBoolean) extends Actor {
+        // tasks waiting for some others to complete
+        private var queued: Queue[Runnable] = Queue.empty
         // Tasks in flight
         private var pending: Map[Runnable, Task] = Map.empty
-        // are we shut down
+        // are we shut down? shutdown means we finish running tasks but don't
+        // accept any more
         private var shutdown = false
         // futures to complete when we are terminated
         private var notifyOnTerminated: List[CompletableFuture[TerminationAwaited]] = Nil
@@ -94,7 +97,6 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
         }
 
         private def addPending(task: Task) = {
-            require(!shutdown)
             pending += (task.runnable -> task)
         }
 
@@ -115,33 +117,17 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                         }
                     case Execute(runnable) =>
                         require(!shutdown) // it isn't allowed to send Execute after Shutdown
-                        if (cancelRequested.get) {
-                            canceled = canceled.enqueue(runnable)
-                        } else {
-                            val f = Future[Completed]({
-                                val c = if (cancelRequested.get) {
-                                    Completed(runnable, true)
-                                } else {
-                                    runnable.run()
-                                    Completed(runnable, false)
-                                }
-                                // we both send ourselves the Completed as a notification,
-                                // and store it in the future for later use
-                                self ! c
-                                c
-                            },
-                                // Infinite timeout is needed to match expected ExecutorService semantics
-                                Int.MaxValue)
-                            val task = Task(f, runnable)
-                            addPending(task)
-                        }
+                        dispatch(runnable)
                     case Completed(runnable, wasCanceled) =>
                         val task = findPending(runnable).get
                         removePending(task)
                         if (wasCanceled) {
                             canceled = canceled.enqueue(runnable)
                         }
-                        if (shutdown && pending.isEmpty) {
+                        if (isTerminated) {
+                            require(pending.isEmpty)
+                            require(queued.isEmpty)
+
                             notifyOnTerminated foreach { l =>
                                 log.debug(self, " sending a terminated notification")
                                 l.complete(Right(terminationAwaitedReply))
@@ -149,6 +135,11 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                             notifyOnTerminated = Nil
                             // queue killing the actor
                             self ! MaybeDie
+                        } else if (queued.nonEmpty) {
+                            // now we can run another queued task
+                            val (head, tail) = queued.dequeue
+                            queued = tail
+                            dispatch(head)
                         }
                     case GetStatus =>
                         self.tryReply(Status(shutdown, isTerminated))
@@ -164,6 +155,33 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                 }
         }
 
+        private def dispatch(runnable: Runnable) = {
+            if (cancelRequested.get) {
+                canceled = canceled.enqueue(runnable)
+            } else if (pending.size >= maxThreads) {
+                require(pending.nonEmpty)
+                // run this task when one of the pending returns
+                queued = queued.enqueue(runnable)
+            } else {
+                val f = Future[Completed]({
+                    val c = if (cancelRequested.get) {
+                        Completed(runnable, true)
+                    } else {
+                        runnable.run()
+                        Completed(runnable, false)
+                    }
+                    // we both send ourselves the Completed as a notification,
+                    // and store it in the future for later use
+                    self ! c
+                    c
+                },
+                    // Infinite timeout is needed to match expected ExecutorService semantics
+                    Int.MaxValue)
+                val task = Task(f, runnable)
+                addPending(task)
+            }
+        }
+
         private def terminationAwaitedReply = {
             val tmp = canceled
             canceled = Queue.empty
@@ -171,7 +189,7 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
         }
 
         private def isTerminated = {
-            shutdown && pending.isEmpty
+            shutdown && pending.isEmpty && queued.isEmpty
         }
 
         private def awaitTermination(timeoutInMs: Long): Unit = {
@@ -193,6 +211,7 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                     remainingTimeMs = 0
                 }
             }
+
             // At this point, all the futures hopefully completed within the timeout,
             // but all the onComplete probably did NOT run yet to drain "pending".
             // We should get Completed messages from the still-pending tasks

@@ -7,17 +7,56 @@ import org.scalatest._
 import akka.actor._
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicInteger
 
 class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
     behavior of "AkkaExecutorService"
+
+    private class HighWaterMark {
+        private val current = new AtomicInteger(0)
+        private val max = new AtomicInteger(0)
+
+        def highWater = max.get
+
+        def increment: Unit = {
+            val v = current.incrementAndGet
+            setMax(v)
+        }
+
+        // ensure _high is >= v
+        private def setMax(v: Int): Unit = {
+            val old = max.get
+            if (old < v) {
+                if (!max.compareAndSet(old, v))
+                    setMax(v)
+            }
+            assert(max.get >= v)
+        }
+
+        def decrement: Unit = {
+            current.decrementAndGet
+        }
+
+        def reset: Unit = {
+            current.set(0)
+            max.set(0)
+        }
+    }
+
+    private val liveTasks = new HighWaterMark
 
     private class TestTask(val id: Int, val sleepTimeMs: Int = 15) extends Runnable {
         private val _done = new AtomicBoolean(false)
         def done = _done.get()
         override def run() = {
-            // simulate taking some time
-            Thread.sleep(sleepTimeMs)
-            _done.set(true)
+            try {
+                liveTasks.increment
+                // simulate taking some time
+                Thread.sleep(sleepTimeMs)
+                _done.set(true)
+            } finally {
+                liveTasks.decrement
+            }
         }
         override def toString = "TestTask(" + id + ")"
     }
@@ -114,6 +153,39 @@ class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
         }
 
         reject.done should be(false)
+    }
+
+    private def countThreadsUsed(maxThreads: Int) = {
+        liveTasks.reset
+
+        val executor = new AkkaExecutorService(maxThreads)
+        val tasks = for (i <- 1 to 200)
+            yield new TestTask(i, 4) // only 4ms so this doesn't take forever
+        tasks foreach { t =>
+            t.done should be(false)
+            executor.execute(t)
+        }
+        // stop new tasks from being submitted
+        executor.shutdown()
+        executor.isShutdown() should be(true)
+        executor.awaitTermination(60, TimeUnit.SECONDS)
+        executor.isTerminated() should be(true)
+
+        tasks foreach { t =>
+            t.done should be(true)
+        }
+
+        liveTasks.highWater
+    }
+
+    it should "obey the requested max threads" in {
+        // note that a max over the Akka dispatcher's max won't work
+        val n2 = countThreadsUsed(2)
+        val n4 = countThreadsUsed(4)
+        val n7 = countThreadsUsed(7)
+        n2 should be(2)
+        n4 should be(4)
+        n7 should be(7)
     }
 
     // this test sort of inherently takes forever, unfortunately
