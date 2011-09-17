@@ -36,6 +36,8 @@ import akka.dispatch.MessageInvocation
  * so this whole file could get deleted later on.
  */
 class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends AbstractExecutorService {
+    private final val log = akka.event.EventHandler
+
     // requests
     private sealed trait ExecutorRequest
     private case class Execute(command: Runnable) extends ExecutorRequest
@@ -81,14 +83,14 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                     executeCountToLog += 1
                 case _ =>
                     if (completedCountToLog > 0) {
-                        akka.event.EventHandler.info(self, "  request=Completed*" + completedCountToLog)
+                        log.debug(self, "  request=Completed*" + completedCountToLog)
                         completedCountToLog = 0
                     }
                     if (executeCountToLog > 0) {
-                        akka.event.EventHandler.info(self, "  request=Execute*" + executeCountToLog)
+                        log.debug(self, "  request=Execute*" + executeCountToLog)
                         executeCountToLog = 0
                     }
-                    akka.event.EventHandler.info(self, "  request=" + request)
+                    log.debug(self, "  request=" + request)
             }
         }
 
@@ -154,7 +156,7 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                         }
                         if (shutdown && pending.isEmpty) {
                             notifyOnTerminated foreach { l =>
-                                akka.event.EventHandler.info(self, " sending a terminated notification")
+                                log.debug(self, " sending a terminated notification")
                                 l.complete(Right(terminationAwaitedReply))
                             }
                             notifyOnTerminated = Nil
@@ -166,16 +168,16 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
                         self.tryReply(Status(shutdown, isTerminated))
                     case Shutdown =>
                         shutdown = true
-                        akka.event.EventHandler.info(self, "processed Shutdown, pending=" + pending.size)
+                        log.debug(self, "processed Shutdown, pending=" + pending.size)
                         self.tryReply(Status(shutdown, isTerminated))
                     case AwaitTermination(inMs) =>
-                        akka.event.EventHandler.info(self, "got AwaitTermination pending=" + pending.size)
+                        log.debug(self, "got AwaitTermination pending=" + pending.size)
                         awaitTermination(inMs)
                         if (isTerminated) {
-                            akka.event.EventHandler.info(self, "Already terminated, sending status")
+                            log.debug(self, "Already terminated, sending status")
                             self.tryReply(terminationAwaitedReply)
                         } else {
-                            akka.event.EventHandler.info(self, "Will notify of termination later, pending: " + pending.size)
+                            log.debug(self, "Will notify of termination later, pending: " + pending.size)
                             val f = new DefaultCompletableFuture[TerminationAwaited]()
                             notifyOnTerminated = f :: notifyOnTerminated
                             self.channel.replyWith(f)
@@ -194,7 +196,7 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
         }
 
         private def awaitTermination(timeoutInMs: Long): Unit = {
-            akka.event.EventHandler.info(self, "awaitTermination pending=" + pending.size)
+            log.debug(self, "awaitTermination pending=" + pending.size)
             if (!shutdown) {
                 throw new IllegalStateException("must shutdown to awaitTermination")
             }
@@ -220,10 +222,10 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
         }
 
         override def preStart = {
-            akka.event.EventHandler.info(self, "Starting up executor actor")
+            log.debug(self, "Starting up executor actor")
         }
         override def postStop = {
-            akka.event.EventHandler.info(self, "Shutting down executor actor")
+            log.debug(self, "Shutting down executor actor")
             require(notifyOnTerminated.isEmpty)
             require(pending.isEmpty)
         }
@@ -237,11 +239,11 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
         // "?" will throw by default on a stopped actor; we want to put an exception
         // in the future instead to avoid special cases
         try {
-            akka.event.EventHandler.info(actor, "Sending to actor with isRunning=" + actor.isRunning + " message=" + message)
+            log.debug(actor, "Sending to actor with isRunning=" + actor.isRunning + " message=" + message)
             actor ? message
         } catch {
             case e: ActorInitializationException =>
-                akka.event.EventHandler.info(actor, "actor was not running, send failed: " + message)
+                log.debug(actor, "actor was not running, send failed: " + message)
                 val f = new DefaultCompletableFuture[Any]()
                 f.completeWithException(new FutureTimeoutException("Actor was not running, immediate timeout"))
                 f
@@ -272,12 +274,12 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
             // completed, that should be a no-op.
             f.get match {
                 case status: Status =>
-                    akka.event.EventHandler.info(actor, "status=" + status)
+                    log.debug(actor, "status=" + status)
                     status
             }
         } catch {
             case e: Throwable =>
-                akka.event.EventHandler.info(actor, "status future threw, actor.isRunning=" + actor.isRunning)
+                log.debug(actor, "status future threw, actor.isRunning=" + actor.isRunning)
                 if (actor.isRunning) {
                     Status(rejecting.get, false)
                 } else {
@@ -287,7 +289,7 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
         } finally {
             val end = System.currentTimeMillis()
             if ((end - start) > 2) {
-                akka.event.EventHandler.info(actor, "****** waiting for status took " + (end - start) + "ms")
+                log.debug(actor, "****** waiting for status took " + (end - start) + "ms")
             }
         }
     }
@@ -311,12 +313,12 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
     }
 
     private def awaitTerminationWithCanceled(timeout: Long, unit: TimeUnit): (Boolean, Seq[Runnable]) = {
-        akka.event.EventHandler.info(actor, "awaitTerminationWithCanceled() method")
+        log.debug(actor, "awaitTerminationWithCanceled() method")
 
         if (!rejecting.get)
             throw new IllegalStateException("Have to shutdown() before you awaitTermination()")
 
-        akka.event.EventHandler.info(actor, "sending AwaitTermination")
+        log.debug(actor, "sending AwaitTermination")
 
         val f = tryAsk(AwaitTermination(unit.toMillis(timeout)))
         val statusFuture = f map { v =>
@@ -343,17 +345,17 @@ class AkkaExecutorService(implicit val dispatcher: MessageDispatcher) extends Ab
     }
 
     override def awaitTermination(timeout: Long, unit: TimeUnit): Boolean = {
-        akka.event.EventHandler.info(actor, "outer awaitTermination() method")
+        log.debug(actor, "outer awaitTermination() method")
         awaitTerminationWithCanceled(timeout, unit)._1
     }
 
     override def isShutdown: Boolean = {
-        akka.event.EventHandler.info(actor, "isShutdown() method, rejecting=" + rejecting.get)
+        log.debug(actor, "isShutdown() method, rejecting=" + rejecting.get)
         rejecting.get
     }
 
     override def isTerminated: Boolean = {
-        akka.event.EventHandler.info(actor, "isTerminated() method")
+        log.debug(actor, "isTerminated() method")
         rejecting.get && askStatus.terminated
     }
 
