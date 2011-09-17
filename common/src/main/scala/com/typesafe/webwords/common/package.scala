@@ -7,6 +7,13 @@ import akka.actor.LocalActorRef
 import akka.dispatch.Future
 import akka.dispatch.MessageInvocation
 import akka.dispatch.MessageQueue
+import akka.actor.Actor
+import akka.dispatch.CompletableFuture
+import akka.actor.ActorInitializationException
+import akka.dispatch.DefaultCompletableFuture
+import akka.dispatch.FutureTimeoutException
+import akka.actor.NullChannel
+import akka.actor.UntypedChannel
 
 package object common {
 
@@ -75,5 +82,18 @@ package object common {
         val mailbox = getMailbox(self)
         self.stop
         sendExceptionsToMailbox(mailbox)
+    }
+
+    def tryAsk(actor: ActorRef, message: Any)(implicit channel: UntypedChannel = NullChannel, timeout: Actor.Timeout = Actor.defaultTimeout): CompletableFuture[Any] = {
+        // "?" will throw by default on a stopped actor; we want to put an exception
+        // in the future instead to avoid special cases
+        try {
+            actor ? message
+        } catch {
+            case e: ActorInitializationException =>
+                val f = new DefaultCompletableFuture[Any]()
+                f.completeWithException(new ActorKilledException("Actor was not running, immediate timeout"))
+                f
+        }
     }
 }
