@@ -9,7 +9,7 @@ import org.jsoup.nodes.Document
 import scala.collection.parallel.ParSeq
 
 class Index(val url: URL,
-    val links: Map[String, String],
+    val links: Seq[(String, String)],
     val wordCounts: Seq[(String, Int)])
 
 class IndexerActor
@@ -36,7 +36,7 @@ class IndexerActor
                 if (href.nonEmpty && text.nonEmpty)
                     builder += (text -> href)
             }
-            builder.result
+            builder.result.toSeq.sortBy(_._1)
         }
 
         private def wordCounts(doc: Document) = {
