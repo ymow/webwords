@@ -10,21 +10,23 @@ import scala.collection.parallel.ParSeq
 
 import com.typesafe.webwords.common.Index
 
+sealed trait IndexerRequest
+case class IndexHtml(url: URL, doc: String) extends IndexerRequest
+
+sealed trait IndexerReply
+case class IndexedHtml(index: Index) extends IndexerReply
+
 class IndexerActor
     extends Actor
     with CPUBoundActorPool {
-
-    sealed trait IndexerRequest
-    case class IndexHtml(url: URL, doc: String) extends IndexerRequest
-
-    sealed trait IndexerReply
-    case class IndexedHtml(index: Index) extends IndexerReply
 
     override def instance = Actor.actorOf(new Worker())
 
     override def receive = _route
 
     private class Worker extends Actor {
+        import IndexerActor._
+
         private def links(doc: Document) = {
             val as = doc.select("a").asScala
             val builder = Map.newBuilder[String, String]
@@ -40,8 +42,11 @@ class IndexerActor
         private def wordCounts(doc: Document) = {
             val body = doc.select("body").first
             // splitWords creates a parallel collection so this is multithreaded!
-            val words = IndexerActor.splitWords(body.text)
-            IndexerActor.wordCount(words).toSeq.sortBy(_._2) take 20
+            // in a real app you'd want to profile and see if this makes sense;
+            // it may well not depending on workload, number of cores, etc.
+            // but it's interesting to see how to do it.
+            val words = splitWords(body.text) filter { !boring(_) }
+            wordCount(words).toSeq.sortBy(0 - _._2) take 50
         }
 
         override def receive = {
@@ -60,9 +65,10 @@ object IndexerActor {
 
     // this is in the companion object for ease of unit testing
     private[indexer] def splitWords(s: String): ParSeq[String] = {
+        // ".par" is the magic that gives us a parallel algorithm
         val lines = s.split("\\n").toSeq.par
         val words = lines flatMap { line =>
-            notWordRegex.split(line) filter { _.nonEmpty }
+            notWordRegex.split(line) filter { w => w.nonEmpty }
         }
         words
     }
@@ -77,5 +83,44 @@ object IndexerActor {
                     sofar + (word -> 1)
             }
         })
+    }
+
+    // not very scientific or internationalized ;-)
+    private val boringEnglishWords = Set(
+        "a",
+        "also",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "been",
+        "by",
+        "can",
+        "for",
+        "from",
+        "has",
+        "have",
+        "in",
+        "it",
+        "is",
+        "may",
+        "not",
+        "of",
+        "on",
+        "or",
+        "such",
+        "that",
+        "the",
+        "this",
+        "to",
+        "was",
+        "which",
+        "with")
+    private[indexer] def boring(word: String) = {
+        // no single letters or super-high-frequency words
+        word.length == 1 ||
+            boringEnglishWords.contains(word.toLowerCase)
     }
 }
