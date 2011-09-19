@@ -54,6 +54,7 @@ object URLFetcher {
         val config = builder.setMaximumConnectionsTotal(1000)
             .setMaximumConnectionsPerHost(10)
             .setExecutorService(executor)
+            .setFollowRedirects(true)
             .build
         new AsyncHttpClient(config)
     }
