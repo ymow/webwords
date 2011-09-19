@@ -1,16 +1,14 @@
 package com.typesafe.webwords.indexer
 
 import scala.collection.JavaConverters._
-import akka.actor._
+import akka.actor.{ Index => _, _ } // akka 2.0 doesn't export "Index" anymore, workaround in meantime
 import com.typesafe.webwords.common.CPUBoundActorPool
 import java.net.URL
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import scala.collection.parallel.ParSeq
 
-class Index(val url: URL,
-    val links: Seq[(String, String)],
-    val wordCounts: Seq[(String, Int)])
+import com.typesafe.webwords.common.Index
 
 class IndexerActor
     extends Actor
