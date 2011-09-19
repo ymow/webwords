@@ -36,6 +36,8 @@ object Dependencies {
     val akka = "se.scalablesolutions.akka" % "akka-actor" % "1.2-RC6"
 
     val asyncHttp = "com.ning" % "async-http-client" % "1.6.5"
+
+    val jsoup = "org.jsoup" % "jsoup" % "1.6.1"
 }
 
 object WebWordsBuild extends Build {
@@ -58,7 +60,7 @@ object WebWordsBuild extends Build {
     lazy val indexer = Project("webwords-indexer",
                               file("indexer"),
                               settings = projectSettings ++
-                              Seq()) dependsOn(common)
+                              Seq(libraryDependencies ++= Seq(jsoup, scalatest))) dependsOn(common)
 
     lazy val common = Project("webwords-common",
                            file("common"),
