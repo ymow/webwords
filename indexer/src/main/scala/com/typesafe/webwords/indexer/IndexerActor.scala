@@ -53,7 +53,7 @@ class IndexerActor
             case request: IndexerRequest => request match {
                 case IndexHtml(url, docString) =>
                     val doc = Jsoup.parse(docString, url.toExternalForm)
-                    val index = new Index(url, links(doc), wordCounts(doc))
+                    val index = new Index(links(doc), wordCounts(doc))
                     self.tryReply(IndexedHtml(index))
             }
         }
