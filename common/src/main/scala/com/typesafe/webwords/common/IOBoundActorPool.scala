@@ -16,6 +16,7 @@ import akka.routing._
  */
 trait IOBoundActorPool
     extends DefaultActorPool
+    with SmallestMailboxSelector
     with ActiveFuturesPressureCapacitor
     with BoundedCapacityStrategy
     with Filter
@@ -23,6 +24,12 @@ trait IOBoundActorPool
     with BasicBackoff {
     self: Actor =>
 
+    // Selector: selectionCount is how many pool members to send each message to
+    override def selectionCount = 1
+    // Selector: partialFill controls whether to pick less than selectionCount or
+    // send the same message to duplicate delegates, when the pool is smaller
+    // than selectionCount. Does not matter if lowerBound >= selectionCount.
+    override def partialFill = true
     // BoundedCapacitor: create between lowerBound and upperBound delegates in the pool
     override val lowerBound = 1
     override lazy val upperBound = 50
