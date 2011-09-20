@@ -33,7 +33,7 @@ object Dependencies {
     val scalatest = "org.scalatest" %% "scalatest" % "1.6.1" % "test"
     val slf4jSimpleTest = "org.slf4j" % "slf4j-simple" % "1.6.2" % "test"
 
-    val jettyVersion = "7.3.1.v20110307"
+    val jettyVersion = "7.4.0.v20110414"
     val jettyServer = "org.eclipse.jetty" % "jetty-server" % jettyVersion
     val jettyServerTest = jettyServer % "test"
 
