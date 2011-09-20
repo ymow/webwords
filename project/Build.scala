@@ -37,7 +37,7 @@ object Dependencies {
     val jettyServer = "org.eclipse.jetty" % "jetty-server" % jettyVersion
     val jettyServerTest = jettyServer % "test"
 
-    val akka = "se.scalablesolutions.akka" % "akka-actor" % "1.2-RC6"
+    val akka = "se.scalablesolutions.akka" % "akka-actor" % "1.2"
 
     val asyncHttp = "com.ning" % "async-http-client" % "1.6.5"
 
