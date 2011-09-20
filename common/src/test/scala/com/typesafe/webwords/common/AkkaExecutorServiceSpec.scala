@@ -45,7 +45,7 @@ class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
 
     private val liveTasks = new HighWaterMark
 
-    private class TestTask(val id: Int, val sleepTimeMs: Int = 15) extends Runnable {
+    private class TestTask(val id: Int, val sleepTimeMs: Long = 15) extends Runnable {
         private val _done = new AtomicBoolean(false)
         def done = _done.get()
         override def run() = {
@@ -191,8 +191,9 @@ class AkkaExecutorServiceSpec extends FlatSpec with ShouldMatchers {
     // this test sort of inherently takes forever, unfortunately
     it should "wait for tasks that take longer than Akka timeout" in {
         val executor = new AkkaExecutorService()
+        val longerTimeout = Actor.defaultTimeout.duration.toMillis + 5000
         val tasks = for (i <- 1 to 5)
-            yield new TestTask(i, 15 * 1000)
+            yield new TestTask(i, longerTimeout)
         tasks foreach { t =>
             t.done should be(false)
             executor.execute(t)
