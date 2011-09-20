@@ -2,6 +2,9 @@ import sbt._
 import Keys._
 
 object BuildSettings {
+    import Dependencies._
+    import Resolvers._
+
     val buildOrganization = "com.typesafe"
     val buildVersion = "1.0"
     val buildScalaVersion = "2.9.0-1"
@@ -12,8 +15,9 @@ object BuildSettings {
         scalaVersion := buildScalaVersion,
         scalacOptions += "-deprecation",
         fork in test := true,
-        resolvers := Seq(Resolvers.scalaToolsRepo, Resolvers.jbossRepo,
-                         Resolvers.akkaRepo, Resolvers.sonatypeRepo))
+        libraryDependencies ++= Seq(slf4jSimpleTest, scalatest),
+        resolvers := Seq(scalaToolsRepo, jbossRepo,
+                         akkaRepo, sonatypeRepo))
 
     val projectSettings = Defaults.defaultSettings ++ globalSettings
 }
@@ -60,11 +64,11 @@ object WebWordsBuild extends Build {
     lazy val indexer = Project("webwords-indexer",
                               file("indexer"),
                               settings = projectSettings ++
-                              Seq(libraryDependencies ++= Seq(jsoup, scalatest))) dependsOn(common)
+                              Seq(libraryDependencies ++= Seq(jsoup))) dependsOn(common)
 
     lazy val common = Project("webwords-common",
                            file("common"),
                            settings = projectSettings ++
-                           Seq(libraryDependencies ++= Seq(akka, asyncHttp, jettyServerTest, scalatest, slf4jSimpleTest)))
+                           Seq(libraryDependencies ++= Seq(akka, asyncHttp, jettyServerTest)))
 }
 
