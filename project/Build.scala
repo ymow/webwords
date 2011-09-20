@@ -42,6 +42,8 @@ object Dependencies {
     val asyncHttp = "com.ning" % "async-http-client" % "1.6.5"
 
     val jsoup = "org.jsoup" % "jsoup" % "1.6.1"
+
+    val casbahCore = "com.mongodb.casbah" %% "casbah-core" % "2.1.5-1"
 }
 
 object WebWordsBuild extends Build {
@@ -69,6 +71,6 @@ object WebWordsBuild extends Build {
     lazy val common = Project("webwords-common",
                            file("common"),
                            settings = projectSettings ++
-                           Seq(libraryDependencies ++= Seq(akka, asyncHttp)))
+                           Seq(libraryDependencies ++= Seq(akka, asyncHttp, casbahCore)))
 }
 
