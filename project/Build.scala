@@ -59,12 +59,12 @@ object WebWordsBuild extends Build {
     lazy val web = Project("webwords-web",
                            file("web"),
                            settings = projectSettings ++
-                           Seq(libraryDependencies ++= Seq(jettyServer))) dependsOn(common)
+                           Seq(libraryDependencies ++= Seq(jettyServer))) dependsOn(common % "compile->compile;test->test")
 
     lazy val indexer = Project("webwords-indexer",
                               file("indexer"),
                               settings = projectSettings ++
-                              Seq(libraryDependencies ++= Seq(jsoup))) dependsOn(common)
+                              Seq(libraryDependencies ++= Seq(jsoup))) dependsOn(common % "compile->compile;test->test")
 
     lazy val common = Project("webwords-common",
                            file("common"),
