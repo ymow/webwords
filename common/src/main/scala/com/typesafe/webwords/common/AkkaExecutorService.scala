@@ -41,8 +41,6 @@ import akka.dispatch.MessageInvocation
  * instead...
  */
 class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit val dispatcher: MessageDispatcher) extends AbstractExecutorService {
-    private final val log = akka.event.EventHandler
-
     // requests
     private sealed trait ExecutorRequest
     private case class Execute(command: Runnable) extends ExecutorRequest
@@ -53,6 +51,7 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
 
     // we send these two to ourselves
     private case class Completed(runnable: Runnable, canceled: Boolean) extends ExecutorRequest
+    // we can't use PoisonPill because we want stopActorNotifyingMailbox() instead of plain stop()
     private case object MaybeDie extends ExecutorRequest
 
     // replies
@@ -75,27 +74,6 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
         // runnables that we canceled with shutdownNow
         private var canceled = Queue.empty[Runnable]
 
-        private var completedCountToLog = 0
-        private var executeCountToLog = 0
-        private def logRequest(request: ExecutorRequest) = {
-            request match {
-                case c: Completed =>
-                    completedCountToLog += 1
-                case e: Execute =>
-                    executeCountToLog += 1
-                case _ =>
-                    if (completedCountToLog > 0) {
-                        log.debug(self, "  request=Completed*" + completedCountToLog)
-                        completedCountToLog = 0
-                    }
-                    if (executeCountToLog > 0) {
-                        log.debug(self, "  request=Execute*" + executeCountToLog)
-                        executeCountToLog = 0
-                    }
-                    log.debug(self, "  request=" + request)
-            }
-        }
-
         private def addPending(task: Task) = {
             pending += (task.runnable -> task)
         }
@@ -108,8 +86,6 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
 
         override def receive = {
             case request: ExecutorRequest =>
-                logRequest(request)
-
                 request match {
                     case MaybeDie =>
                         if (isTerminated) {
@@ -129,7 +105,6 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
                             require(queued.isEmpty)
 
                             notifyOnTerminated foreach { l =>
-                                log.debug(self, " sending a terminated notification")
                                 l.complete(Right(terminationAwaitedReply))
                             }
                             notifyOnTerminated = Nil
@@ -150,7 +125,6 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
                         shutdown = true
                         awaitTermination(20 * 1000)
                     case AwaitTermination(inMs) =>
-                        log.debug(self, "got AwaitTermination pending=" + pending.size)
                         awaitTermination(inMs)
                 }
         }
@@ -193,7 +167,6 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
         }
 
         private def awaitTermination(timeoutInMs: Long): Unit = {
-            log.debug(self, "awaitTermination pending=" + pending.size)
             if (!shutdown) {
                 throw new IllegalStateException("must shutdown to awaitTermination")
             }
@@ -218,12 +191,10 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
             // which will cause us to finally reply to the AwaitTermination
             // message
             if (isTerminated) {
-                log.debug(self, "Already terminated, sending status")
                 self.tryReply(terminationAwaitedReply)
                 // schedule death
                 self ! MaybeDie
             } else {
-                log.debug(self, "Will notify of termination later, pending: " + pending.size)
                 val f = new DefaultCompletableFuture[TerminationAwaited]()
                 notifyOnTerminated = f :: notifyOnTerminated
                 self.channel.replyWith(f)
@@ -262,12 +233,10 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
             // completed, that should be a no-op.
             f.get match {
                 case status: Status =>
-                    log.debug(actor, "status=" + status)
                     status
             }
         } catch {
             case e: Throwable =>
-                log.debug(actor, "status future threw, actor.isRunning=" + actor.isRunning)
                 if (actor.isRunning) {
                     Status(rejecting.get, false)
                 } else {
@@ -287,12 +256,8 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
     }
 
     override def awaitTermination(timeout: Long, unit: TimeUnit): Boolean = {
-        log.debug(actor, "outer awaitTermination() method")
-
         if (!rejecting.get)
             throw new IllegalStateException("Have to shutdown() before you awaitTermination()")
-
-        log.debug(actor, "sending AwaitTermination")
 
         val timeoutMs = unit.toMillis(timeout)
         val f = tryAskWithTimeout(AwaitTermination(timeoutMs), timeoutMs)
@@ -302,12 +267,10 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
     }
 
     override def isShutdown: Boolean = {
-        log.debug(actor, "isShutdown() method, rejecting=" + rejecting.get)
         rejecting.get
     }
 
     override def isTerminated: Boolean = {
-        log.debug(actor, "isTerminated() method")
         rejecting.get && blockForStatus(tryAsk(actor, GetStatus)).terminated
     }
 
@@ -318,8 +281,6 @@ class AkkaExecutorService(private val maxThreads: Int = Int.MaxValue)(implicit v
     }
 
     override def shutdownNow: java.util.List[Runnable] = {
-        log.debug(actor, "shutdownNow() method")
-
         rejecting.set(true)
 
         // If we send a message, it won't shutdown "now",
