@@ -15,7 +15,7 @@ object BuildSettings {
         scalaVersion := buildScalaVersion,
         scalacOptions += "-deprecation",
         fork in test := true,
-        libraryDependencies ++= Seq(slf4jSimpleTest, scalatest),
+        libraryDependencies ++= Seq(slf4jSimpleTest, scalatest, jettyServerTest),
         resolvers := Seq(scalaToolsRepo, jbossRepo,
                          akkaRepo, sonatypeRepo))
 
@@ -69,6 +69,6 @@ object WebWordsBuild extends Build {
     lazy val common = Project("webwords-common",
                            file("common"),
                            settings = projectSettings ++
-                           Seq(libraryDependencies ++= Seq(akka, asyncHttp, jettyServerTest)))
+                           Seq(libraryDependencies ++= Seq(akka, asyncHttp)))
 }
 
