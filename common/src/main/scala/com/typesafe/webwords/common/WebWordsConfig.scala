@@ -7,6 +7,9 @@ object WebWordsConfig {
         val amqpURL = Option(System.getenv("RABBITMQ_URL"))
         val mongoURL = Option(System.getenv("MONGOHQ_URL"))
         val port = Option(System.getenv("PORT")) map { s => Integer.parseInt(s) }
-        WebWordsConfig(amqpURL, mongoURL, port)
+        val config = WebWordsConfig(amqpURL, mongoURL, port)
+        // FIXME remove this or use a proper logger
+        println("Configuration is: " + config)
+        config
     }
 }
