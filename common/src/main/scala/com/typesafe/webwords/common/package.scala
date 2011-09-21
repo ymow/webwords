@@ -23,7 +23,7 @@ package object common {
          * Replies to a channel with the result or exception from
          * the passed-in future
          */
-        def replyWith[A <: T](f: Future[A]) = {
+        def replyWith[A <: T](f: Future[A])(implicit sender: UntypedChannel) = {
             f.onComplete({ f =>
                 f.value.get match {
                     case Left(t) =>
