@@ -141,43 +141,33 @@ class IndexStorageActor(mongoURI: Option[String])
     override def preStart() = {
         // Open connection to MongoDB and set up our collection
 
-        val uri = MongoURI(mongoURI.getOrElse("mongodb://localhost:27017/"))
-
         /* Unfortunately, mongo-java-driver (and therefore Casbah) will
          * ignore the port, username, and password in the URI.
+         * Moreover, the MongoURI class doesn't parse them correctly.
          * So we have to manually extract and use them even
          * though a MongoConnection(u:MongoURI) exists.
          * Doing this manually we don't use replica sets
          * in the URL correctly, but at least we can connect
-         * in the simple case. MongoURI also leaves the
-         * :port in the "host" part of the parsed URI.
+         * in the simple case.
          */
+        val uri = IndexStorageActor.parseMongoURI(mongoURI.getOrElse("mongodb:///")).getOrElse(throw new Exception("bad mongo URI:" + mongoURI))
+
         // FIXME remove the debug stuff
+        println("mongo host=" + uri.host)
+        println("mongo port=" + uri.port)
+        println("mongo db=" + uri.database)
 
-        val hostWithPort = uri.hosts(0)
-        println("mongo hostWithPort=" + hostWithPort)
-        val split = hostWithPort.split(":", 2)
-        val host = split(0)
-        val port = if (split.size > 1) Integer.parseInt(split(1)) else 27017
-
-        println("mongo host=" + host)
-        println("mongo port=" + port)
-
-        connection = Some(MongoConnection(host, port))
-        val dbname =
-            if (uri.database == null || uri.database.isEmpty)
-                "webwords"
-            else
-                uri.database
+        connection = Some(MongoConnection(uri.host, uri.port))
+        val dbname = uri.database.getOrElse("webwords")
 
         database = connection map { c => c(dbname) }
 
-        if (uri.username != null) {
-            println("mongo authenticating as " + uri.username)
-            database.get.authenticate(uri.username,
-                // uri.password is an Array[Char] not a String for some reason
-                new String(uri.password))
-        } else {
+        uri.user foreach { username =>
+            println("mongo authenticating as " + username)
+            database.get.authenticate(username, uri.password.orNull)
+        }
+
+        if (uri.user.isEmpty) {
             println("mongo has no username")
         }
 
@@ -264,5 +254,26 @@ object IndexStorageActor {
         }
 
         new Index(links, wordCounts)
+    }
+
+    private def stripSlash(s: String) =
+        if (s.startsWith("/")) s.substring(1) else s
+
+    private[common] case class MongoURIParts(user: Option[String], password: Option[String],
+        host: String, port: Int, database: Option[String])
+
+    // the MongoURI class in mongo-java-parser is broken and blows up
+    // with port, username, and password involved, so we need this.
+    private[common] def parseMongoURI(s: String): Option[MongoURIParts] = {
+        val mongoDefaults = URIParts(scheme = "mongodb", host = Some("localhost"), port = Some(27017),
+            user = None, password = None, path = None)
+        expandURI(s, mongoDefaults) flatMap { parts =>
+            if (parts.scheme != "mongodb")
+                None
+            else
+                Some(MongoURIParts(user = parts.user, password = parts.password,
+                    host = parts.host.get, port = parts.port.get,
+                    database = parts.path map { stripSlash(_) }))
+        }
     }
 }
