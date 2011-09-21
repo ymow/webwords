@@ -42,7 +42,7 @@ class IndexStorageActor(mongoURI: Option[String])
                 cache.insert(MongoDBObject("url" -> url,
                     "time" -> System.currentTimeMillis().toDouble,
                     "index" -> indexAsDBObject(index)))
-                self reply IndexCached(url)
+                self tryReply IndexCached(url)
 
             case FetchCachedIndex(url) =>
                 // "$natural" -> -1 means reverse insertion order
