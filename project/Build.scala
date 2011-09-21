@@ -63,7 +63,7 @@ object WebWordsBuild extends Build {
     lazy val web = Project("webwords-web",
                            file("web"),
                            settings = projectSettings ++
-                           Seq(libraryDependencies ++= Seq(akkaHttp))) dependsOn(common % "compile->compile;test->test")
+                           Seq(libraryDependencies ++= Seq(akkaHttp, jettyServer))) dependsOn(common % "compile->compile;test->test")
 
     lazy val indexer = Project("webwords-indexer",
                               file("indexer"),
