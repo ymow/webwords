@@ -7,6 +7,11 @@ object AMQPCheck {
         try {
             val factory = new ConnectionFactory()
             val params = AbstractWorkQueueActor.parseAmqpUrl(config.amqpURL.getOrElse("amqp:///"))
+            factory.setHost(params.addresses(0).getHost)
+            factory.setPort(params.addresses(0).getPort)
+            factory.setUsername(params.username)
+            factory.setPassword(params.password)
+            factory.setVirtualHost(params.virtualHost)
 
             val connection = factory.newConnection()
             val channel = connection.createChannel()
