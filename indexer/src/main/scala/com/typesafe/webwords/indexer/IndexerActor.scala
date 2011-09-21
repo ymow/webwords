@@ -1,13 +1,15 @@
 package com.typesafe.webwords.indexer
 
 import scala.collection.JavaConverters._
-import akka.actor.{ Index => _, _ } // akka 2.0 doesn't export "Index" anymore, workaround in meantime
+import akka.actor.{ Index => _, _ }
 import com.typesafe.webwords.common.CPUBoundActorPool
 import java.net.URL
+import java.net.URI
+import java.net.URISyntaxException
+import java.net.MalformedURLException
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import scala.collection.parallel.ParSeq
-
 import com.typesafe.webwords.common.Index
 
 sealed trait IndexerRequest
@@ -31,8 +33,23 @@ class IndexerActor
             val as = doc.select("a").asScala
             val builder = Map.newBuilder[String, String]
             for (a <- as) {
-                val href = a.attr("abs:href")
                 val text = a.text
+                val href = try {
+                    // be paranoid here and we don't have to worry about it
+                    // anywhere else in the code.
+                    val maybeInvalid = a.attr("abs:href")
+                    if (maybeInvalid.isEmpty)
+                        throw new URISyntaxException(maybeInvalid, "empty URI")
+                    new URI(maybeInvalid)
+                    new URL(maybeInvalid)
+                    maybeInvalid
+                } catch {
+                    case e: URISyntaxException =>
+                        ""
+                    case e: MalformedURLException =>
+                        ""
+                }
+
                 if (href.nonEmpty && text.nonEmpty)
                     builder += (text -> href)
             }
