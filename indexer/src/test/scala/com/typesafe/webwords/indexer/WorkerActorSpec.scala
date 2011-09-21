@@ -23,10 +23,11 @@ class WorkerActorSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAl
 
     it should "get an index" in {
         val testdb = Some("mongodb://localhost/webwordsworkertest")
+        val config = WebWordsConfig(None, testdb, None)
         val url = httpServer.resolve("/resource/ToSpider.html")
-        val worker = Actor.actorOf(new WorkerActor(None, testdb)).start
+        val worker = Actor.actorOf(new WorkerActor(config)).start
         Thread.sleep(500) // help ensure worker's amqp exchange is set up
-        val client = Actor.actorOf(new ClientActor(None, testdb)).start
+        val client = Actor.actorOf(new ClientActor(config)).start
         val indexFuture = (client ? GetIndex(url.toExternalForm)) map { result =>
             result match {
                 case GotIndex(url, Some(index)) =>

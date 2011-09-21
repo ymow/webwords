@@ -1,12 +1,11 @@
 package com.typesafe.webwords.indexer
 
 import akka.actor._
+import com.typesafe.webwords.common._
 import java.util.concurrent.CountDownLatch
 
 object Main extends App {
-    val mongoURL = Option(System.getenv("MONGOHQ_URL"))
-    val amqpURL = Option(System.getenv("RABBITMQ_URL"))
-    val worker = Actor.actorOf(new WorkerActor(amqpURL, mongoURL))
+    val worker = Actor.actorOf(new WorkerActor(WebWordsConfig()))
 
     worker.start
 

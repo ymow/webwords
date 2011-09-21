@@ -8,10 +8,10 @@ import java.net.URL
 /**
  * This actor listens to the work queue, spiders and caches results.
  */
-class WorkerActor(amqpUrl: Option[String], mongoUrl: Option[String])
-    extends WorkQueueWorkerActor(amqpUrl) {
+class WorkerActor(config: WebWordsConfig)
+    extends WorkQueueWorkerActor(config.amqpURL) {
     private val spider = Actor.actorOf(new SpiderActor)
-    private val cache = Actor.actorOf(new IndexStorageActor(mongoUrl))
+    private val cache = Actor.actorOf(new IndexStorageActor(config.mongoURL))
 
     override def handleRequest(request: WorkQueueRequest): Future[WorkQueueReply] = {
         request match {

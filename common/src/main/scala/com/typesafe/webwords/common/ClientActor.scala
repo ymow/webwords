@@ -11,10 +11,10 @@ case class GetIndex(url: String) extends ClientActorIncoming
 sealed trait ClientActorOutgoing
 case class GotIndex(url: String, index: Option[Index]) extends ClientActorOutgoing
 
-class ClientActor(amqpURL: Option[String], mongoURL: Option[String]) extends Actor {
+class ClientActor(config: WebWordsConfig) extends Actor {
 
-    private val client = Actor.actorOf(new WorkQueueClientActor(amqpURL))
-    private val cache = Actor.actorOf(new IndexStorageActor(mongoURL))
+    private val client = Actor.actorOf(new WorkQueueClientActor(config.amqpURL))
+    private val cache = Actor.actorOf(new IndexStorageActor(config.mongoURL))
 
     override def receive = {
         case incoming: ClientActorIncoming =>
