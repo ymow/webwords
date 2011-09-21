@@ -28,33 +28,33 @@ class WebServer(config: WebWordsConfig) {
                         }
                     }
                     if (url.isDefined) {
-                        val futureIndexOption = client ? GetIndex(url.get.toExternalForm) map { reply =>
-                            reply match {
-                                case GotIndex(url, indexOption) =>
-                                    indexOption
-                            }
-                        }
+                        val futureGotIndex = client ? GetIndex(url.get.toExternalForm)
 
                         // block for prototype purposes, we'll switch to something better later
-                        val maybeIndex = futureIndexOption.get
+                        futureGotIndex.await
 
-                        maybeIndex match {
-                            case Some(index) =>
+                        futureGotIndex.result match {
+                            case Some(GotIndex(url, Some(index), cacheHit)) =>
                                 response.setContentType("text/plain")
-                                response.setCharacterEncoding("UTF-8")
+                                response.setCharacterEncoding("utf-8")
                                 response.setStatus(HttpServletResponse.SC_OK)
                                 val writer = response.getWriter()
+                                writer.println("Meta")
+                                writer.println("=====")
+                                writer.println("Cache hit = " + cacheHit)
+                                writer.println("")
                                 writer.println("Word Counts")
                                 writer.println("=====")
                                 for ((word, count) <- index.wordCounts) {
                                     writer.println(word + "\t\t" + count)
                                 }
+                                writer.println("")
                                 writer.println("Links")
                                 writer.println("=====")
                                 for ((text, url) <- index.links) {
                                     writer.println(text + "\t\t" + url)
                                 }
-                            case None =>
+                            case _ =>
                                 response.setContentType("text/plain")
                                 response.setStatus(HttpServletResponse.SC_OK)
                                 response.getWriter().println("Failed to index url in time")

@@ -30,7 +30,7 @@ class WorkerActorSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAl
         val client = Actor.actorOf(new ClientActor(config)).start
         val indexFuture = (client ? GetIndex(url.toExternalForm)) map { result =>
             result match {
-                case GotIndex(url, Some(index)) =>
+                case GotIndex(url, Some(index), cacheHit) =>
                     index
                 case _ =>
                     throw new Exception("Got bad result from worker: " + result)

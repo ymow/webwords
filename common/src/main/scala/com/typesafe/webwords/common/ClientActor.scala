@@ -9,7 +9,7 @@ sealed trait ClientActorIncoming
 case class GetIndex(url: String) extends ClientActorIncoming
 
 sealed trait ClientActorOutgoing
-case class GotIndex(url: String, index: Option[Index]) extends ClientActorOutgoing
+case class GotIndex(url: String, index: Option[Index], cacheHit: Boolean) extends ClientActorOutgoing
 
 class ClientActor(config: WebWordsConfig) extends Actor {
     import ClientActor._
@@ -24,17 +24,13 @@ class ClientActor(config: WebWordsConfig) extends Actor {
                     // we look in the cache, if that fails, ask spider to
                     // spider and then notify us, and then we look in the
                     // cache again.
-                    val futureIndexOption = getFromCacheOrElse(cache, url) {
-                        getFromWorker(client, url) flatMap { _ =>
-                            getFromCacheOrElse(cache, url) {
-                                new AlreadyCompletedFuture[Option[Index]](Right(None))
-                            }
-                        }
-                    }
-
                     val futureGotIndex: Future[ClientActorOutgoing] =
-                        futureIndexOption map { indexOption =>
-                            GotIndex(url, indexOption)
+                        getFromCacheOrElse(cache, url, cacheHit = true) {
+                            getFromWorker(client, url) flatMap { _ =>
+                                getFromCacheOrElse(cache, url, cacheHit = false) {
+                                    new AlreadyCompletedFuture[GotIndex](Right(GotIndex(url, index = None, cacheHit = false)))
+                                }
+                            }
                         }
 
                     self.channel.replyWith(futureGotIndex)
@@ -53,11 +49,11 @@ class ClientActor(config: WebWordsConfig) extends Actor {
 }
 
 object ClientActor {
-    private def getFromCacheOrElse(cache: ActorRef, url: String)(fallback: => Future[Option[Index]]): Future[Option[Index]] = {
+    private def getFromCacheOrElse(cache: ActorRef, url: String, cacheHit: Boolean)(fallback: => Future[GotIndex]): Future[GotIndex] = {
         cache ? FetchCachedIndex(url) flatMap { fetched =>
             fetched match {
                 case CachedIndexFetched(Some(index)) =>
-                    new AlreadyCompletedFuture(Right(Some(index)))
+                    new AlreadyCompletedFuture(Right(GotIndex(url, Some(index), cacheHit)))
                 case CachedIndexFetched(None) =>
                     fallback
             }
