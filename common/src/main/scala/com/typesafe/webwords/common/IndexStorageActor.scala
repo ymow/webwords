@@ -152,23 +152,13 @@ class IndexStorageActor(mongoURI: Option[String])
          */
         val uri = IndexStorageActor.parseMongoURI(mongoURI.getOrElse("mongodb:///")).getOrElse(throw new Exception("bad mongo URI:" + mongoURI))
 
-        // FIXME remove the debug stuff
-        println("mongo host=" + uri.host)
-        println("mongo port=" + uri.port)
-        println("mongo db=" + uri.database)
-
         connection = Some(MongoConnection(uri.host, uri.port))
         val dbname = uri.database.getOrElse("webwords")
 
         database = connection map { c => c(dbname) }
 
         uri.user foreach { username =>
-            println("mongo authenticating as " + username)
             database.get.authenticate(username, uri.password.orNull)
-        }
-
-        if (uri.user.isEmpty) {
-            println("mongo has no username")
         }
 
         cache = database map { db => db(cacheName) }
