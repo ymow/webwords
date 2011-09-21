@@ -141,8 +141,29 @@ class IndexStorageActor(mongoURI: Option[String])
     override def preStart() = {
         // Open connection to MongoDB and set up our collection
 
-        val uri = MongoURI(mongoURI.getOrElse("mongodb://localhost/"))
-        connection = Some(MongoConnection(uri))
+        val uri = MongoURI(mongoURI.getOrElse("mongodb://localhost:27017/"))
+
+        /* Unfortunately, mongo-java-driver (and therefore Casbah) will
+         * ignore the port, username, and password in the URI.
+         * So we have to manually extract and use them even
+         * though a MongoConnection(u:MongoURI) exists.
+         * Doing this manually we don't use replica sets
+         * in the URL correctly, but at least we can connect
+         * in the simple case. MongoURI also leaves the
+         * :port in the "host" part of the parsed URI.
+         */
+        // FIXME remove the debug stuff
+
+        val hostWithPort = uri.hosts(0)
+        println("mongo hostWithPort=" + hostWithPort)
+        val split = hostWithPort.split(":", 2)
+        val host = split(0)
+        val port = if (split.size > 1) Integer.parseInt(split(1)) else 27017
+
+        println("mongo host=" + host)
+        println("mongo port=" + port)
+
+        connection = Some(MongoConnection(host, port))
         val dbname =
             if (uri.database == null || uri.database.isEmpty)
                 "webwords"
@@ -150,6 +171,16 @@ class IndexStorageActor(mongoURI: Option[String])
                 uri.database
 
         database = connection map { c => c(dbname) }
+
+        if (uri.username != null) {
+            println("mongo authenticating as " + uri.username)
+            database.get.authenticate(uri.username,
+                // uri.password is an Array[Char] not a String for some reason
+                new String(uri.password))
+        } else {
+            println("mongo has no username")
+        }
+
         cache = database map { db => db(cacheName) }
 
         recreateCache()
