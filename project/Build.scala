@@ -38,6 +38,8 @@ object Dependencies {
     val jettyServerTest = jettyServer % "test"
 
     val akka = "se.scalablesolutions.akka" % "akka-actor" % "1.2"
+    val akkaHttp = "se.scalablesolutions.akka" % "akka-http" % "1.2"
+    val akkaAmqp = "se.scalablesolutions.akka" % "akka-amqp" % "1.2"
 
     val asyncHttp = "com.ning" % "async-http-client" % "1.6.5"
 
@@ -61,7 +63,7 @@ object WebWordsBuild extends Build {
     lazy val web = Project("webwords-web",
                            file("web"),
                            settings = projectSettings ++
-                           Seq(libraryDependencies ++= Seq(jettyServer))) dependsOn(common % "compile->compile;test->test")
+                           Seq(libraryDependencies ++= Seq(akkaHttp))) dependsOn(common % "compile->compile;test->test")
 
     lazy val indexer = Project("webwords-indexer",
                               file("indexer"),
@@ -71,6 +73,6 @@ object WebWordsBuild extends Build {
     lazy val common = Project("webwords-common",
                            file("common"),
                            settings = projectSettings ++
-                           Seq(libraryDependencies ++= Seq(akka, asyncHttp, casbahCore)))
+                           Seq(libraryDependencies ++= Seq(akka, akkaAmqp, asyncHttp, casbahCore)))
 }
 
