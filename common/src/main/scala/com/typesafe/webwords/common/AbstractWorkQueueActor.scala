@@ -151,9 +151,15 @@ object AbstractWorkQueueActor {
             }
         } getOrElse (defaults.username -> defaults.password)
 
-        ConnectionParameters(addresses = Array(address),
+        val params = ConnectionParameters(addresses = Array(address),
             username = user,
             password = password,
             virtualHost = vhost)
+        // FIXME remove this debug logging
+        println("amqp params=" + params)
+        println("amqp params addresses=" + address)
+        println("amqp params address.host" + address.getHost)
+        println("amqp params address.port" + address.getPort)
+        params
     }
 }
