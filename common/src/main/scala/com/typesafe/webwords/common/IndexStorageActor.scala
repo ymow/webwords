@@ -13,6 +13,7 @@ import com.mongodb.casbah.commons.MongoDBList
 import java.util.concurrent.TimeUnit
 import org.bson.types.BasicBSONList
 import com.mongodb.casbah.MongoURI
+import com.mongodb.casbah.WriteConcern
 
 sealed trait IndexStorageRequest
 case class CacheIndex(url: String, index: Index) extends IndexStorageRequest
@@ -134,6 +135,7 @@ class IndexStorageActor(mongoURI: Option[String])
         // order ("natural order") and so if we search in reverse natural
         // order we'll always get the most recent entry.
         c.ensureIndex(MongoDBObject("url" -> 1), "url_index", unique = false)
+        c.setWriteConcern(WriteConcern.Safe)
     }
 
     override def preStart() = {
