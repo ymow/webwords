@@ -126,6 +126,9 @@ abstract class AbstractWorkQueueActor(amqpUrl: Option[String])
 object AbstractWorkQueueActor {
     private val DEFAULT_AMQP_URL = "amqp:///"
 
+    private def stripSlash(s: String) =
+        if (s.startsWith("/")) s.substring(1) else s
+
     // surely the rabbitmq library or something has this somewhere but I can't find it.
     private[common] def parseAmqpUrl(url: String): ConnectionParameters = {
         // Example: amqp://uname:pwd@host:13029/vhost
@@ -143,7 +146,7 @@ object AbstractWorkQueueActor {
         val params = ConnectionParameters(addresses = Array(address),
             username = parts.user.get,
             password = parts.password.get,
-            virtualHost = parts.path.get)
+            virtualHost = stripSlash(parts.path.get))
         // FIXME remove this debug logging
         println("amqp params=" + params)
         println("amqp params addresses=" + address)
