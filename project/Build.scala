@@ -1,5 +1,6 @@
 import sbt._
 import Keys._
+import com.typesafe.startscript.StartScriptPlugin
 
 object BuildSettings {
     import Dependencies._
@@ -58,16 +59,20 @@ object WebWordsBuild extends Build {
     lazy val root = Project("webwords",
                             file("."),
                             settings = projectSettings ++
-                            Seq()) aggregate(common, web, indexer)
+                            Seq(
+                                StartScriptPlugin.stage in Compile := Unit
+                            )) aggregate(common, web, indexer)
 
     lazy val web = Project("webwords-web",
                            file("web"),
                            settings = projectSettings ++
+                           StartScriptPlugin.startScriptForClassesSettings ++
                            Seq(libraryDependencies ++= Seq(akkaHttp, jettyServer))) dependsOn(common % "compile->compile;test->test")
 
     lazy val indexer = Project("webwords-indexer",
                               file("indexer"),
                               settings = projectSettings ++
+                              StartScriptPlugin.startScriptForClassesSettings ++
                               Seq(libraryDependencies ++= Seq(jsoup))) dependsOn(common % "compile->compile;test->test")
 
     lazy val common = Project("webwords-common",
