@@ -1,7 +1,5 @@
 package com.typesafe.webwords.indexer
 
-import scala.collection.generic.CanBuildFrom
-import scala.collection.mutable.Builder
 import akka.actor.{ Index => _, _ }
 import akka.dispatch._
 import java.net.URL
