@@ -91,7 +91,7 @@ object WorkQueueReply {
  * To understand AMQP a good resource is:
  * http://www.rabbitmq.com/tutorials/amqp-concepts.html
  */
-abstract class AbstractWorkQueueActor(amqpUrl: String)
+abstract class AbstractWorkQueueActor(amqpUrl: Option[String])
     extends Actor {
     protected[this] val info = akka.event.EventHandler.info(this, _: String)
 
@@ -111,7 +111,7 @@ abstract class AbstractWorkQueueActor(amqpUrl: String)
     protected val rpcExchangeName = "webwords_rpc"
 
     override def preStart = {
-        val params = AbstractWorkQueueActor.parseAmqpUrl(amqpUrl)
+        val params = AbstractWorkQueueActor.parseAmqpUrl(amqpUrl.getOrElse(AbstractWorkQueueActor.DEFAULT_AMQP_URL))
         connectionActor = Some(AMQP.newConnection(params.copy(connectionCallback = Some(self))))
         createRpc(connectionActor.get)
     }
@@ -124,7 +124,7 @@ abstract class AbstractWorkQueueActor(amqpUrl: String)
 }
 
 object AbstractWorkQueueActor {
-    private[common] val DEFAULT_AMQP_URL = "amqp:///"
+    private val DEFAULT_AMQP_URL = "amqp:///"
 
     // surely the rabbitmq library or something has this somewhere but I can't find it.
     private[common] def parseAmqpUrl(url: String): ConnectionParameters = {

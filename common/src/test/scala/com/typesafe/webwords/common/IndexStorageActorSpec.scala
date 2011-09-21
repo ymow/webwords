@@ -28,7 +28,7 @@ class IndexStorageActorSpec extends FlatSpec with ShouldMatchers {
     private val exampleUrl = new URL("http://example.com/")
     private val exampleUrl2 = new URL("http://example2.com/")
 
-    private def newActor = Actor.actorOf(new IndexStorageActor("mongodb://localhost/webwordstest")).start
+    private def newActor = Actor.actorOf(new IndexStorageActor(Some("mongodb://localhost/webwordstest"))).start
 
     behavior of "IndexStorageActor"
 

@@ -6,7 +6,7 @@ import akka.amqp
 import akka.amqp.AMQP
 import akka.amqp.rpc.RPC
 
-abstract class WorkQueueWorkerActor(url: String = AbstractWorkQueueActor.DEFAULT_AMQP_URL)
+abstract class WorkQueueWorkerActor(url: Option[String] = None)
     extends AbstractWorkQueueActor(url) {
 
     private[this] var rpcServer: Option[RPC.RpcServerHandle] = None

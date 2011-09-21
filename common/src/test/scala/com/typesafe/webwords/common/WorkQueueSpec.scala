@@ -7,7 +7,7 @@ import akka.dispatch._
 
 class WorkQueueSpec extends FlatSpec with ShouldMatchers {
 
-    private class EchoWorker(amqpUrl: String = AbstractWorkQueueActor.DEFAULT_AMQP_URL) extends WorkQueueWorkerActor(amqpUrl) {
+    private class EchoWorker(amqpUrl: Option[String] = None) extends WorkQueueWorkerActor(amqpUrl) {
         override def handleRequest(request: WorkQueueRequest) = {
             request match {
                 case SpiderAndCache(url) =>

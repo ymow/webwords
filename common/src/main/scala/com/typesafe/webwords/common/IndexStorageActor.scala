@@ -21,10 +21,11 @@ case object DropCache extends IndexStorageRequest
 case object GetCacheSize extends IndexStorageRequest
 
 sealed trait IndexStorageReply
+case class IndexCached(url: String) extends IndexStorageReply
 case class CachedIndexFetched(index: Option[Index]) extends IndexStorageReply
 case class CacheSize(size: Long) extends IndexStorageReply
 
-class IndexStorageActor(mongoURI: String)
+class IndexStorageActor(mongoURI: Option[String])
     extends Actor
     with IOBoundActorPool {
 
@@ -41,6 +42,7 @@ class IndexStorageActor(mongoURI: String)
                 cache.insert(MongoDBObject("url" -> url,
                     "time" -> System.currentTimeMillis().toDouble,
                     "index" -> indexAsDBObject(index)))
+                self reply IndexCached(url)
 
             case FetchCachedIndex(url) =>
                 // "$natural" -> -1 means reverse insertion order
@@ -137,9 +139,15 @@ class IndexStorageActor(mongoURI: String)
     override def preStart() = {
         // Open connection to MongoDB and set up our collection
 
-        val uri = MongoURI(mongoURI)
+        val uri = MongoURI(mongoURI.getOrElse("mongodb://localhost/"))
         connection = Some(MongoConnection(uri))
-        database = connection map { c => c(uri.database) }
+        val dbname =
+            if (uri.database == null || uri.database.isEmpty)
+                "webwords"
+            else
+                uri.database
+
+        database = connection map { c => c(dbname) }
         cache = database map { db => db(cacheName) }
 
         recreateCache()
