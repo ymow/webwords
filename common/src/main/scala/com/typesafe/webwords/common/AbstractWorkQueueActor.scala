@@ -130,36 +130,25 @@ object AbstractWorkQueueActor {
     private[common] def parseAmqpUrl(url: String): ConnectionParameters = {
         // Example: amqp://uname:pwd@host:13029/vhost
 
-        val defaults = ConnectionParameters() // hack to get at the default values
-        val defaultAddress = defaults.addresses(0)
+        val defaultParams = ConnectionParameters() // hack to get at the default values
+        val defaultAddress = defaultParams.addresses(0)
+        val defaults = URIParts(scheme = "amqp", user = Some(defaultParams.username),
+            password = Some(defaultParams.password), host = Some(defaultAddress.getHost), port = Some(defaultAddress.getPort),
+            path = Some(defaultParams.virtualHost))
 
-        val uri = new URI(url)
+        val parts = expandURI(url, defaults).getOrElse(throw new Exception("Bad AMQP URI: " + url))
 
-        val host = Option(uri.getHost).getOrElse(defaultAddress.getHost)
-        val port = if (uri.getPort == -1) defaultAddress.getPort else uri.getPort
-        val address = new Address(host, port)
-
-        val vhost = Option(uri.getPath).getOrElse(defaults.virtualHost)
-
-        val userInfo = Option(uri.getUserInfo)
-        val (user, password) = userInfo map { ui =>
-            if (ui.contains(":")) {
-                val a = ui.split(":", 2)
-                (a(0) -> a(1))
-            } else {
-                (ui -> defaults.password)
-            }
-        } getOrElse (defaults.username -> defaults.password)
+        val address = new Address(parts.host.get, parts.port.get)
 
         val params = ConnectionParameters(addresses = Array(address),
-            username = user,
-            password = password,
-            virtualHost = vhost)
+            username = parts.user.get,
+            password = parts.password.get,
+            virtualHost = parts.path.get)
         // FIXME remove this debug logging
         println("amqp params=" + params)
         println("amqp params addresses=" + address)
-        println("amqp params address.host" + address.getHost)
-        println("amqp params address.port" + address.getPort)
+        println("amqp params address.host=" + address.getHost)
+        println("amqp params address.port=" + address.getPort)
         params
     }
 }
