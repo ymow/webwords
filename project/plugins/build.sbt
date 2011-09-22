@@ -5,5 +5,5 @@ resolvers += {
 }
 
 libraryDependencies <<= (libraryDependencies, sbtVersion) { (deps, version) =>
-  deps :+ ("com.typesafe.startscript" %% "xsbt-start-script-plugin" % "0.1-SNAPSHOT" extra("sbtversion" -> version))
+  deps :+ ("com.typesafe.startscript" %% "xsbt-start-script-plugin" % "0.2.0" extra("sbtversion" -> version))
 }
