@@ -1,12 +1,13 @@
 package com.typesafe.webwords.indexer
 
+import java.io.File
+import java.net.URI
+import java.net.URL
+
+import com.typesafe.webwords.common._
+
 import akka.actor.{ Index => _, _ }
 import akka.dispatch._
-import java.net.URL
-import com.typesafe.webwords.common._
-import java.net.URI
-import java.io.File
-import java.util.concurrent.CountDownLatch
 
 sealed trait SpiderRequest
 case class Spider(url: URL) extends SpiderRequest
