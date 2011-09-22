@@ -96,9 +96,36 @@ object SpiderActor {
         toFollow
     }
 
-    private def mergeIndexes(a: Index, b: Index): Index = {
+    private[indexer] def combineSortedCounts(sortedA: List[(String, Int)], sortedB: List[(String, Int)]): List[(String, Int)] = {
+        if (sortedA == Nil) {
+            sortedB
+        } else if (sortedB == Nil) {
+            sortedA
+        } else {
+            val aHead = sortedA.head
+            val bHead = sortedB.head
+            val aWord = aHead._1
+            val bWord = bHead._1
+
+            if (aWord == bWord) {
+                (aWord -> (aHead._2 + bHead._2)) :: combineSortedCounts(sortedA.tail, sortedB.tail)
+            } else if (aWord < bWord) {
+                aHead :: combineSortedCounts(sortedA.tail, sortedB)
+            } else {
+                bHead :: combineSortedCounts(sortedA, sortedB.tail)
+            }
+        }
+    }
+
+    private[indexer] def combineCounts(a: Seq[(String, Int)], b: Seq[(String, Int)]) = {
+        combineSortedCounts(a.toList.sortBy(_._1), b.toList.sortBy(_._1)).sortBy(0 - _._2)
+    }
+
+    private[indexer] def mergeIndexes(a: Index, b: Index): Index = {
         val links = (a.links ++ b.links).sortBy(_._1).distinct
-        val counts = (a.wordCounts ++ b.wordCounts).sortBy(0 - _._2).take(math.max(a.wordCounts.length, b.wordCounts.length))
+
+        // ideally we might combine and count length at the same time, but we'll live
+        val counts = combineCounts(a.wordCounts, b.wordCounts).take(math.max(a.wordCounts.length, b.wordCounts.length))
         new Index(links, counts)
     }
 

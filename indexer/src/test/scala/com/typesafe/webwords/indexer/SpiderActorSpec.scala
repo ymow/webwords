@@ -94,6 +94,23 @@ class SpiderActorSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAl
         SpiderActor.pathDepth(new URI("/a/b/c")) should be(3)
     }
 
+    it should "combine sorted word count lists" in {
+        import SpiderActor._
+
+        combineCounts(Nil, Nil) should be(Nil)
+        val threeHellos = List("hello" -> 3)
+        val sixHellos = List("hello" -> 6)
+        combineCounts(threeHellos, Nil) should be(threeHellos)
+        combineCounts(Nil, threeHellos) should be(threeHellos)
+        combineCounts(threeHellos, threeHellos) should be(sixHellos)
+
+        val someCounts = List("j" -> 5, "p" -> 4, "c" -> 3, "b" -> 2, "a" -> 1)
+        val longerCounts = List("z" -> 11, "f" -> 7, "j" -> 5, "p" -> 4, "c" -> 3, "b" -> 2, "a" -> 1)
+        val combinedCounts = List("z" -> 11, "j" -> 10, "p" -> 8, "f" -> 7, "c" -> 6, "b" -> 4, "a" -> 2)
+        combineCounts(someCounts, longerCounts) should be(combinedCounts)
+        combineCounts(longerCounts, someCounts) should be(combinedCounts)
+    }
+
     behavior of "SpiderActor"
 
     it should "spider from test http server" in {
