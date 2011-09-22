@@ -3,9 +3,8 @@ package com.typesafe.webwords.common
 import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.TimeUnit
-
+import java.util.concurrent.Executors
 import com.ning.http.client._
-
 import akka.actor._
 import akka.dispatch._
 import akka.event.EventHandler
@@ -51,11 +50,11 @@ object URLFetcher {
     // and connection pool associated with it, it's supposed to
     // be shared among lots of requests, not per-http-request
     private def makeClient(implicit dispatcher: MessageDispatcher) = {
-        val executor = new AkkaExecutorService(maxThreads = 8)(dispatcher)
+        val executor = Executors.newCachedThreadPool()
 
         val builder = new AsyncHttpClientConfig.Builder()
         val config = builder.setMaximumConnectionsTotal(1000)
-            .setMaximumConnectionsPerHost(10)
+            .setMaximumConnectionsPerHost(15)
             .setExecutorService(executor)
             .setFollowRedirects(true)
             .build
