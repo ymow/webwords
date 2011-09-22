@@ -99,6 +99,9 @@ package object common {
         }
     }
 
+    private def stripSlash(s: String) =
+        if (s.startsWith("/")) s.substring(1) else s
+
     case class URIParts(scheme: String, user: Option[String], password: Option[String],
         host: Option[String], port: Option[Int], path: Option[String])
 
@@ -109,7 +112,8 @@ package object common {
             val host = Option(uri.getHost) orElse (defaults.host)
             val port = (if (uri.getPort == -1) None else Some(uri.getPort)) orElse (defaults.port)
 
-            val path = Option(uri.getPath) orElse (defaults.path)
+            // URI has the "/" in front of the path but URIParts strips it off.
+            val path = Option(stripSlash(uri.getPath)) orElse (defaults.path)
             val userInfo = Option(uri.getUserInfo)
             val (user, password) = userInfo map { ui =>
                 if (ui.contains(":")) {

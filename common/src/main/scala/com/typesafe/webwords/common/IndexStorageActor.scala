@@ -246,9 +246,6 @@ object IndexStorageActor {
         new Index(links, wordCounts)
     }
 
-    private def stripSlash(s: String) =
-        if (s.startsWith("/")) s.substring(1) else s
-
     private[common] case class MongoURIParts(user: Option[String], password: Option[String],
         host: String, port: Int, database: Option[String])
 
@@ -263,7 +260,7 @@ object IndexStorageActor {
             else
                 Some(MongoURIParts(user = parts.user, password = parts.password,
                     host = parts.host.get, port = parts.port.get,
-                    database = parts.path map { stripSlash(_) }))
+                    database = parts.path))
         }
     }
 }

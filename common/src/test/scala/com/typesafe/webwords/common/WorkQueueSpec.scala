@@ -25,7 +25,7 @@ class WorkQueueSpec extends FlatSpec with ShouldMatchers {
         params.addresses(0).getPort should be(13029)
         params.username should be("uname")
         params.password should be("pwd")
-        params.virtualHost should be("/vhost")
+        params.virtualHost should be("vhost")
     }
 
     it should "parse a default url" in {

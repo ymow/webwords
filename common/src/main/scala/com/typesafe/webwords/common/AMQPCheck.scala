@@ -3,14 +3,13 @@ package com.typesafe.webwords.common
 import com.rabbitmq.client._
 
 object AMQPCheck {
-    private def stripSlash(s: String) =
-        if (s.startsWith("/")) s.substring(1) else s
-
     private def stack(exc: Throwable): Unit = {
         println(exc.getStackTraceString)
         println("AMQP not working: " + exc.getClass.getSimpleName + ": " + exc.getMessage)
         if (exc.getCause != null)
             stack(exc.getCause)
+        else
+            println(" (throwable has no further getCause)")
     }
 
     def check(config: WebWordsConfig, sleepBeforeCloseMs: Long): Boolean = {
@@ -23,18 +22,10 @@ object AMQPCheck {
             factory.setPassword(params.password)
             factory.setVirtualHost(params.virtualHost)
 
-            val connection = try {
-                factory.newConnection()
-            } catch {
-                case e: Throwable =>
-                    stack(e)
-                    println("AMQP failed with virtual host '" + params.virtualHost + "' trying with no /")
-                    factory.setVirtualHost(stripSlash(params.virtualHost))
-                    factory.newConnection()
-            }
+            val connection = factory.newConnection()
             val channel = connection.createChannel()
 
-            val QUEUE_NAME = "test_queue_checking"
+            val QUEUE_NAME = "webwords_check_queue"
 
             channel.queueDeclare(QUEUE_NAME, false, false, false, null)
             val message = "Hello World!"
@@ -47,7 +38,6 @@ object AMQPCheck {
             true
         } catch {
             case e: Throwable =>
-
                 stack(e)
                 false
         }
