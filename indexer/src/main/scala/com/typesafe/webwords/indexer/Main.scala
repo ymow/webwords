@@ -11,10 +11,12 @@ import com.typesafe.webwords.common.AMQPCheck
  * storing results in a persistent cache (kept in MongoDB).
  */
 object Main extends App {
-    if (!AMQPCheck.check(WebWordsConfig(), 0))
-        throw new Exception("AMQP not working")
+    val config = WebWordsConfig()
 
-    val worker = Actor.actorOf(new WorkerActor(WebWordsConfig()))
+    if (!AMQPCheck.check(config))
+        throw new Exception("AMQP not working (start the AMQP service?)")
+
+    val worker = Actor.actorOf(new WorkerActor(config))
 
     worker.start
 
