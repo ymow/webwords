@@ -7,6 +7,7 @@ import java.net.URL
 
 /**
  * This actor listens to the work queue, spiders and caches results.
+ * It's the "root" actor of the indexer process.
  */
 class WorkerActor(config: WebWordsConfig)
     extends WorkQueueWorkerActor(config.amqpURL) {

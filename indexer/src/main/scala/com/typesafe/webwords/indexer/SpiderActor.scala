@@ -15,8 +15,14 @@ sealed trait SpiderReply
 case class Spidered(url: URL, index: Index)
 
 /**
- * This actor coordinates requests to the other actors to
- * eventually put together a shallow spider of a URL.
+ * This actor coordinates URLFetcher and IndexerActor actors in order
+ * to do a shallow spider of a site and compute an "index" for the
+ * site. An index is a list of word counts and a list of links found
+ * on the site.
+ *
+ * There's some list processing in functional style in this file
+ * that may be of interest if you're learning about Scala and
+ * functional programming.
  */
 class SpiderActor
     extends Actor {

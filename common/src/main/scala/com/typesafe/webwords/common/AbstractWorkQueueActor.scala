@@ -90,6 +90,10 @@ object WorkQueueReply {
  * processes.
  * To understand AMQP a good resource is:
  * http://www.rabbitmq.com/tutorials/amqp-concepts.html
+ *
+ * There are two subclasses of AbstractWorkQueueActor,
+ * one for the "client" (the web process) and one for the
+ * "worker" (the indexer process).
  */
 abstract class AbstractWorkQueueActor(amqpUrl: Option[String])
     extends Actor {

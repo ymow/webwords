@@ -6,6 +6,9 @@ import akka.amqp
 import akka.amqp.AMQP
 import akka.amqp.rpc.RPC
 
+/**
+ * This actor wraps the work queue on the worker process side.
+ */
 abstract class WorkQueueWorkerActor(url: Option[String] = None)
     extends AbstractWorkQueueActor(url) {
 

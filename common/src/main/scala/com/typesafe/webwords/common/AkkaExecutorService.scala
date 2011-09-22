@@ -25,12 +25,6 @@ import akka.dispatch.MessageInvocation
  * implementation is delegated to an ExecutorActor
  * which in turn has a pool of actors used to run tasks.
  *
- * We could also cheat and create a class in the Akka package that
- * accesses private field ExecutorBasedEventDrivenDispatcher.executorService,
- * but that seems kind of evil, though now that I see this file is so
- * large maybe it was a better idea. There is a problem with that approach
- * which is no way to awaitTermination().
- *
  * There is a ticket to solve this upstream:
  * https://www.assembla.com/spaces/akka/tickets/1208
  * so this whole file could get deleted later on.

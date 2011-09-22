@@ -1,5 +1,9 @@
 package com.typesafe.webwords.common
 
+/**
+ * This is the information we scrape about a URL.
+ * Links found on the site, and word counts of words on the site.
+ */
 final class Index(val links: Seq[(String, String)],
     val wordCounts: Seq[(String, Int)]) {
     override def toString = {

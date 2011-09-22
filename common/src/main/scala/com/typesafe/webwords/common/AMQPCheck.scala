@@ -2,6 +2,16 @@ package com.typesafe.webwords.common
 
 import com.rabbitmq.client._
 
+/**
+ * This uses the plain Java com.rabbitmq API to be sure we can connect to the
+ * AMQP broker. It's a lot easier to debug "failed to start AMQP" with this
+ * than with akka-aqmp which fires up multiple connections and repeatedly
+ * tries to reconnect - it ends up pretty noisy if the AMQP server is down.
+ *
+ * As a side effect, this is a nice illustration of using an unmodified
+ * Java API from Scala. You could certainly just use this directly
+ * rather than the akka-aqmp wrapper, if you wanted to.
+ */
 object AMQPCheck {
     private def stack(exc: Throwable): Unit = {
         println(exc.getStackTraceString)
@@ -25,11 +35,11 @@ object AMQPCheck {
             val connection = factory.newConnection()
             val channel = connection.createChannel()
 
-            val QUEUE_NAME = "webwords_check_queue"
+            val queueName = "webwords_check_queue"
 
-            channel.queueDeclare(QUEUE_NAME, false, false, false, null)
+            channel.queueDeclare(queueName, false, false, false, null)
             val message = "Hello World!"
-            channel.basicPublish("", QUEUE_NAME, null, message.getBytes())
+            channel.basicPublish("", queueName, null, message.getBytes())
 
             Thread.sleep(sleepBeforeCloseMs)
 

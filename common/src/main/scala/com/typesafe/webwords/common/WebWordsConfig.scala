@@ -1,5 +1,8 @@
 package com.typesafe.webwords.common
 
+/**
+ * This class represents our app configuration.
+ */
 case class WebWordsConfig(amqpURL: Option[String], mongoURL: Option[String], port: Option[Int])
 
 object WebWordsConfig {

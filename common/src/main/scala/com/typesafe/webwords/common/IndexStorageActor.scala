@@ -26,6 +26,14 @@ case class IndexCached(url: String) extends IndexStorageReply
 case class CachedIndexFetched(index: Option[Index]) extends IndexStorageReply
 case class CacheSize(size: Long) extends IndexStorageReply
 
+/**
+ * This actor encapsulates storing Index objects in a cache,
+ * in this case the cache is a MongoDB collection accessed
+ * using the Casbah library.
+ *
+ * We're using a MongoDB "capped collection," see:
+ *   http://www.mongodb.org/display/DOCS/Capped+Collections
+ */
 class IndexStorageActor(mongoURI: Option[String])
     extends Actor
     with IOBoundActorPool {

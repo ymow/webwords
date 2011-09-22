@@ -11,6 +11,14 @@ case class GetIndex(url: String, skipCache: Boolean) extends ClientActorIncoming
 sealed trait ClientActorOutgoing
 case class GotIndex(url: String, index: Option[Index], cacheHit: Boolean) extends ClientActorOutgoing
 
+/**
+ * This actor encapsulates:
+ *  - checking the cache for an index of a certain URL
+ *  - asking the indexer worker process to index the URL if it's not cached
+ *  - checking the cache again when the worker is done
+ * It coordinates a WorkQueueClientActor and IndexStorageActor to accomplish
+ * this.
+ */
 class ClientActor(config: WebWordsConfig) extends Actor {
     import ClientActor._
 

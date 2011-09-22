@@ -5,6 +5,9 @@ import akka.amqp
 import akka.amqp.AMQP
 import akka.amqp.rpc.RPC
 
+/**
+ * This actor wraps the work queue on the "client" side (in the web process).
+ */
 class WorkQueueClientActor(url: Option[String] = None)
     extends AbstractWorkQueueActor(url) {
 

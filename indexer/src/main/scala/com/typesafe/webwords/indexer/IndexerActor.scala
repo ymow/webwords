@@ -18,6 +18,12 @@ case class IndexHtml(url: URL, doc: String) extends IndexerRequest
 sealed trait IndexerReply
 case class IndexedHtml(index: Index) extends IndexerReply
 
+/**
+ * IndexerActor is a CPU-bound actor which parses HTML with the jsoup
+ * library and scrapes some data out of it. The code in here illustrates
+ * algorithmic code in Scala, in a functional style, including use of
+ * parallel collections.
+ */
 class IndexerActor
     extends Actor
     with CPUBoundActorPool {

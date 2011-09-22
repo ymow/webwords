@@ -17,6 +17,10 @@ import akka.dispatch.FutureTimeoutException
 import akka.actor.NullChannel
 import akka.actor.UntypedChannel
 
+/**
+ * This file contains random utility functions.
+ * Some of them may be interesting.
+ */
 package object common {
 
     // Class that adds replyWith to Akka channels
