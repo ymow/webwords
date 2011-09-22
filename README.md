@@ -70,13 +70,30 @@ The build for the app illustrates:
  - testing with ScalaTest
     - http://www.scalatest.org/
 
-## How to run it locally
+### How to run it locally
 
-FIXME
+ - Run `sbt stage` to stage the app (sbt must be sbt 0.10, not 0.7)
+ - Install and start up MongoDB
+    - http://www.mongodb.org/display/DOCS/Quickstart
+ - Install and start up RabbitMQ Server
+    - http://www.rabbitmq.com/server.html
+ - Launch the app as specified in `Procfile` if you have Heroku tools installed
+    - run `foreman start --port 8080`
+ - OR launch the app manually
+    - run `indexer/target/start` to run the indexer process
+    - in another terminal, run `web/target/start` to run the web process
+ - Now open `http://localhost:8080` in a browser
 
-## How to run it on Heroku
+### How to run it on Heroku
 
-FIXME
+ - Install the Heroku tools; be sure `heroku` is on your path
+    - see http://devcenter.heroku.com/articles/heroku-command
+ - Type these commands inside the application's git clone:
+    - `heroku create --stack cedar`
+    - `heroku addons:add mongohq`
+    - `heroku addons:add rabbitmq`
+    - `git push heroku master`
+    - `heroku open`
 
 ## Enjoy
 
