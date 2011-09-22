@@ -32,7 +32,8 @@ object Resolvers {
 
 object Dependencies {
     val scalatest = "org.scalatest" %% "scalatest" % "1.6.1" % "test"
-    val slf4jSimpleTest = "org.slf4j" % "slf4j-simple" % "1.6.2" % "test"
+    val slf4jSimple = "org.slf4j" % "slf4j-simple" % "1.6.2"
+    val slf4jSimpleTest = slf4jSimple % "test"
 
     val jettyVersion = "7.4.0.v20110414"
     val jettyServer = "org.eclipse.jetty" % "jetty-server" % jettyVersion
@@ -68,7 +69,7 @@ object WebWordsBuild extends Build {
                            file("web"),
                            settings = projectSettings ++
                            StartScriptPlugin.startScriptForClassesSettings ++
-                           Seq(libraryDependencies ++= Seq(akkaHttp, jettyServer, jettyServlet))) dependsOn(common % "compile->compile;test->test")
+                           Seq(libraryDependencies ++= Seq(akkaHttp, jettyServer, jettyServlet, slf4jSimple))) dependsOn(common % "compile->compile;test->test")
 
     lazy val indexer = Project("webwords-indexer",
                               file("indexer"),
