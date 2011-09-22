@@ -28,7 +28,7 @@ class WorkerActorSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAl
         val worker = Actor.actorOf(new WorkerActor(config)).start
         Thread.sleep(500) // help ensure worker's amqp exchange is set up
         val client = Actor.actorOf(new ClientActor(config)).start
-        val indexFuture = (client ? GetIndex(url.toExternalForm)) map { result =>
+        val indexFuture = (client ? GetIndex(url.toExternalForm, skipCache = false)) map { result =>
             result match {
                 case GotIndex(url, Some(index), cacheHit) =>
                     index

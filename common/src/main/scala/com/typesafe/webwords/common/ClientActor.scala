@@ -6,7 +6,7 @@ import akka.actor.{ Index => _, _ }
 import akka.dispatch._
 
 sealed trait ClientActorIncoming
-case class GetIndex(url: String) extends ClientActorIncoming
+case class GetIndex(url: String, skipCache: Boolean) extends ClientActorIncoming
 
 sealed trait ClientActorOutgoing
 case class GotIndex(url: String, index: Option[Index], cacheHit: Boolean) extends ClientActorOutgoing
@@ -20,18 +20,23 @@ class ClientActor(config: WebWordsConfig) extends Actor {
     override def receive = {
         case incoming: ClientActorIncoming =>
             incoming match {
-                case GetIndex(url) =>
+                case GetIndex(url, skipCache) =>
+
                     // we look in the cache, if that fails, ask spider to
                     // spider and then notify us, and then we look in the
                     // cache again.
-                    val futureGotIndex: Future[ClientActorOutgoing] =
-                        getFromCacheOrElse(cache, url, cacheHit = true) {
-                            getFromWorker(client, url) flatMap { _ =>
-                                getFromCacheOrElse(cache, url, cacheHit = false) {
-                                    new AlreadyCompletedFuture[GotIndex](Right(GotIndex(url, index = None, cacheHit = false)))
-                                }
+                    def getWithoutCache = {
+                        getFromWorker(client, url) flatMap { _ =>
+                            getFromCacheOrElse(cache, url, cacheHit = false) {
+                                new AlreadyCompletedFuture[GotIndex](Right(GotIndex(url, index = None, cacheHit = false)))
                             }
                         }
+                    }
+
+                    val futureGotIndex = if (skipCache)
+                        getWithoutCache
+                    else
+                        getFromCacheOrElse(cache, url, cacheHit = true) { getWithoutCache }
 
                     self.channel.replyWith(futureGotIndex)
             }

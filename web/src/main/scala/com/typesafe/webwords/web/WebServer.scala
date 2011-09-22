@@ -19,6 +19,7 @@ class WebServer(config: WebWordsConfig) {
         override def handle(target: String, jettyRequest: Request, servletRequest: HttpServletRequest, response: HttpServletResponse) = {
             target match {
                 case "/words" => {
+                    val skipCache = Option(servletRequest.getParameter("skipCache")).getOrElse("false") == "true"
                     val url = Option(servletRequest.getParameter("url")) flatMap { string =>
                         try {
                             Some(new URL(string))
@@ -28,7 +29,7 @@ class WebServer(config: WebWordsConfig) {
                         }
                     }
                     if (url.isDefined) {
-                        val futureGotIndex = client ? GetIndex(url.get.toExternalForm)
+                        val futureGotIndex = client ? GetIndex(url.get.toExternalForm, skipCache)
 
                         // block for prototype purposes, we'll switch to something better later
                         futureGotIndex.await
