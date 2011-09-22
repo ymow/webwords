@@ -150,7 +150,15 @@ class IndexStorageActor(mongoURI: Option[String])
          * in the URL correctly, but at least we can connect
          * in the simple case.
          */
-        val uri = IndexStorageActor.parseMongoURI(mongoURI.getOrElse("mongodb:///")).getOrElse(throw new Exception("bad mongo URI:" + mongoURI))
+        val uri = {
+            val parsed = IndexStorageActor.parseMongoURI(mongoURI.getOrElse("mongodb:///"))
+                .getOrElse(throw new Exception("bad mongo URI:" + mongoURI))
+            // "/" for the URI path means no database was in the URI
+            if (parsed.database == Some("/") || parsed.database == Some(""))
+                parsed.copy(database = None)
+            else
+                parsed
+        }
 
         connection = Some(MongoConnection(uri.host, uri.port))
         val dbname = uri.database.getOrElse("webwords")

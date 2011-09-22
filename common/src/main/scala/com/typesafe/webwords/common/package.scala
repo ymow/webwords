@@ -100,7 +100,12 @@ package object common {
     }
 
     private def stripSlash(s: String) =
-        if (s.startsWith("/")) s.substring(1) else s
+        if (s == "")
+            null
+        else if (s.startsWith("/"))
+            s.substring(1)
+        else
+            s
 
     case class URIParts(scheme: String, user: Option[String], password: Option[String],
         host: Option[String], port: Option[Int], path: Option[String])
