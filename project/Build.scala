@@ -36,6 +36,7 @@ object Dependencies {
 
     val jettyVersion = "7.4.0.v20110414"
     val jettyServer = "org.eclipse.jetty" % "jetty-server" % jettyVersion
+    val jettyServlet = "org.eclipse.jetty" % "jetty-servlet" % jettyVersion
     val jettyServerTest = jettyServer % "test"
 
     val akka = "se.scalablesolutions.akka" % "akka-actor" % "1.2"
@@ -67,7 +68,7 @@ object WebWordsBuild extends Build {
                            file("web"),
                            settings = projectSettings ++
                            StartScriptPlugin.startScriptForClassesSettings ++
-                           Seq(libraryDependencies ++= Seq(akkaHttp, jettyServer))) dependsOn(common % "compile->compile;test->test")
+                           Seq(libraryDependencies ++= Seq(akkaHttp, jettyServer, jettyServlet))) dependsOn(common % "compile->compile;test->test")
 
     lazy val indexer = Project("webwords-indexer",
                               file("indexer"),

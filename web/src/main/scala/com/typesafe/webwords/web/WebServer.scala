@@ -1,95 +1,53 @@
 package com.typesafe.webwords.web
 
-import java.net.URL
-import java.net.MalformedURLException
 import akka.actor._
-import org.eclipse.jetty.server.handler.AbstractHandler
-import org.eclipse.jetty.server.Request
+import akka.http._
 import org.eclipse.jetty.server.Server
-import javax.servlet.http.HttpServletRequest
-import javax.servlet.http.HttpServletResponse
-import org.eclipse.jetty.util.IO
+import org.eclipse.jetty.servlet.ServletHolder
+import org.eclipse.jetty.servlet.ServletContextHandler
 import com.typesafe.webwords.common._
 
+/**
+ * This class manually embeds Jetty (see http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty)
+ * and forwards requests from it to Akka HTTP. There are many other ways to set things up,
+ * for example you could use the Akka Microkernel, or use the standard Jetty distribution's
+ * prebuilt servlet container. Whatever you are used to. See also:
+ *   http://akka.io/docs/akka/1.2/scala/http.html
+ *
+ * You don't have to use Akka HTTP either of course, you could just write a subclass of
+ * AbstractHandler and handle requests yourself. One advantage of Akka HTTP is that it
+ * automatically suspends the Jetty requests so they are truly async (they don't tie
+ * up a thread).
+ */
 class WebServer(config: WebWordsConfig) {
-    private val client = Actor.actorOf(new ClientActor(config))
+    // to use Akka HTTP, we need a RootEndpoint which is an actor that
+    // comes with Akka
+    private val rootEndpoint = Actor.actorOf(new RootEndpoint)
+    // we register this bootstrap actor with the RootEndpoint, and have
+    // it dispatch requests for us
+    private val bootstrap = Actor.actorOf(new WebBootstrap(rootEndpoint, config))
+
     private var maybeServer: Option[Server] = None
-
-    private class WebHandler extends AbstractHandler {
-        override def handle(target: String, jettyRequest: Request, servletRequest: HttpServletRequest, response: HttpServletResponse) = {
-            target match {
-                case "/words" => {
-                    val skipCache = Option(servletRequest.getParameter("skipCache")).getOrElse("false") == "true"
-                    val url = Option(servletRequest.getParameter("url")) flatMap { string =>
-                        try {
-                            Some(new URL(string))
-                        } catch {
-                            case e: MalformedURLException =>
-                                None
-                        }
-                    }
-                    if (url.isDefined) {
-                        val futureGotIndex = client ? GetIndex(url.get.toExternalForm, skipCache)
-
-                        // block for prototype purposes, we'll switch to something better later
-                        futureGotIndex.await
-
-                        futureGotIndex.result match {
-                            case Some(GotIndex(url, Some(index), cacheHit)) =>
-                                response.setContentType("text/plain")
-                                response.setCharacterEncoding("utf-8")
-                                response.setStatus(HttpServletResponse.SC_OK)
-                                val writer = response.getWriter()
-                                writer.println("Meta")
-                                writer.println("=====")
-                                writer.println("Cache hit = " + cacheHit)
-                                writer.println("")
-                                writer.println("Word Counts")
-                                writer.println("=====")
-                                for ((word, count) <- index.wordCounts) {
-                                    writer.println(word + "\t\t" + count)
-                                }
-                                writer.println("")
-                                writer.println("Links")
-                                writer.println("=====")
-                                for ((text, url) <- index.links) {
-                                    writer.println(text + "\t\t" + url)
-                                }
-                            case _ =>
-                                response.setContentType("text/plain")
-                                response.setStatus(HttpServletResponse.SC_OK)
-                                response.getWriter().println("Failed to index url in time")
-                        }
-                    } else {
-                        response.setContentType("text/plain")
-                        response.setStatus(HttpServletResponse.SC_BAD_REQUEST)
-                        response.getWriter().println("Invalid or missing url parameter")
-                    }
-                    jettyRequest.setHandled(true)
-                }
-                case "/hello" => {
-                    response.setContentType("text/plain")
-                    response.setStatus(HttpServletResponse.SC_OK)
-                    response.getWriter().println("Hello")
-                    jettyRequest.setHandled(true)
-                }
-                case _ =>
-                    response.setStatus(HttpServletResponse.SC_NOT_FOUND)
-                    jettyRequest.setHandled(true)
-            }
-        }
-    }
 
     def start(): Unit = {
         if (maybeServer.isDefined)
             throw new IllegalStateException("can't start http server twice")
 
-        client.start
-
-        val handler = new WebHandler
+        rootEndpoint.start
+        bootstrap.start
 
         val server = new Server(config.port.getOrElse(8080))
+
+        // here we pull in the servlet container; if we didn't want to use AkkaMistServlet,
+        // we could just subclass AbstractHandler and skip this dependency.
+        val handler = new ServletContextHandler(ServletContextHandler.SESSIONS)
+        handler.setContextPath("/")
+        // AkkaMistServlet forwards requests to the rootEndpoint which
+        // in turn forwards them to our bootstrap actor.
+        handler.addServlet(new ServletHolder(new AkkaMistServlet()), "/*");
+
         server.setHandler(handler)
+
         server.start()
 
         maybeServer = Some(server)
@@ -104,6 +62,8 @@ class WebServer(config: WebWordsConfig) {
             server.stop()
         }
         maybeServer = None
-        client.stop
+
+        bootstrap.stop
+        rootEndpoint.stop
     }
 }
