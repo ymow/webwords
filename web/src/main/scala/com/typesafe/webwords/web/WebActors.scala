@@ -1,6 +1,8 @@
 package com.typesafe.webwords.web
 
 import scala.collection.mutable
+import scala.xml
+import scala.xml.Attribute
 import akka.actor.{ Index => _, _ }
 import akka.http._
 import com.typesafe.webwords.common._
@@ -38,27 +40,64 @@ class WordsActor(config: WebWordsConfig) extends Actor {
         val elapsed = System.currentTimeMillis - finish.startTime
         finish match {
             case Finish(request, url, Some(index), cacheHit, startTime) =>
-                val response = request.response
-                response.setContentType("text/plain")
-                response.setCharacterEncoding("utf-8")
-                val writer = response.getWriter()
-                writer.println("Meta")
-                writer.println("=====")
-                writer.println("Cache hit = " + cacheHit)
-                writer.println("Time = " + elapsed + "ms")
-                writer.println("")
-                writer.println("Word Counts")
-                writer.println("=====")
-                for ((word, count) <- index.wordCounts) {
-                    writer.println(word + "\t\t" + count)
+                // world's ugliest word cloud!
+                def countToStyle(count: Int) = {
+                    val maxCount = (index.wordCounts.headOption map { _._2 }).getOrElse(1)
+                    val font = 6 + ((count.doubleValue / maxCount.doubleValue) * 24).intValue
+                    Attribute("style", xml.Text("font-size: " + font + "pt;"), xml.Null)
                 }
-                writer.println("")
-                writer.println("Links")
-                writer.println("=====")
-                for ((text, url) <- index.links) {
-                    writer.println(text + "\t\t" + url)
-                }
-                request.OK("")
+
+                val html =
+                    <html>
+                        <head>
+                            <title>Web Words!</title>
+                        </head>
+                        <body style="max-width: 800px;">
+                            <div>
+                                <div>
+                                    <p>
+                                        <a href={ url }>{ url }</a>
+                                        spidered and indexed.
+                                    </p>
+                                    <p>{ elapsed }ms elapsed.</p>
+                                    <p>{ index.links.size } links scraped.</p>
+                                    {
+                                        if (cacheHit)
+                                            <p>Results were retrieved from cache.</p>
+                                        else
+                                            <p>Results newly-spidered (not from cache).</p>
+                                    }
+                                </div>
+                                <h3>Word Counts</h3>
+                                <div style="max-width: 600px; margin-left: 100px; margin-top: 20px; margin-bottom: 20px;">
+                                    {
+                                        val nodes = xml.NodeSeq.newBuilder
+                                        for ((word, count) <- index.wordCounts) {
+                                            nodes += <span title={ count.toString }>{ word }</span> % countToStyle(count)
+                                            nodes += xml.Text(" ")
+                                        }
+                                        nodes.result
+                                    }
+                                </div>
+                                <div style="font-size: small">(hover to see counts)</div>
+                                <h3>Links Found</h3>
+                                <div style="margin-left: 50px;">
+                                    <ol>
+                                        {
+                                            val nodes = xml.NodeSeq.newBuilder
+                                            for ((text, url) <- index.links)
+                                                nodes += <li><a href={ url }>{ text }</a></li>
+                                            nodes.result
+                                        }
+                                    </ol>
+                                </div>
+                            </div>
+                        </body>
+                    </html>
+
+                request.response.setContentType("text/html")
+                request.response.setCharacterEncoding("utf-8")
+                request.OK("<!DOCTYPE html>\n" + html)
             case Finish(request, url, None, cacheHit, startTime) =>
                 request.OK("Failed to index url in " + elapsed + "ms (try reloading)")
         }
