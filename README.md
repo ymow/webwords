@@ -22,6 +22,9 @@ The app shows:
   processes
      - http://heroku.com
 
+You can run the app using free price tiers from Heroku, MongoHQ, and RabbitMQ.
+You can also run it locally, of course.
+
 ## A request step-by-step
 
 If you follow an incoming request to the app, here's what the app
@@ -66,6 +69,14 @@ The build for the app illustrates:
     - https://github.com/typesafehub/xsbt-start-script-plugin
  - testing with ScalaTest
     - http://www.scalatest.org/
+
+## How to run it locally
+
+FIXME
+
+## How to run it on Heroku
+
+FIXME
 
 ## Enjoy
 
