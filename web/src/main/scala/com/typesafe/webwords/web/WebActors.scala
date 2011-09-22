@@ -7,7 +7,9 @@ import akka.actor.{ Index => _, _ }
 import akka.http._
 import com.typesafe.webwords.common._
 import java.net.URL
+import java.net.URI
 import java.net.MalformedURLException
+import java.net.URISyntaxException
 import javax.servlet.http.HttpServletResponse
 
 // this is just here for testing a simple case.
@@ -36,85 +38,142 @@ class WordsActor(config: WebWordsConfig) extends Actor {
     case class Finish(request: RequestMethod, url: String, index: Option[Index],
         cacheHit: Boolean, startTime: Long)
 
+    private def form(url: String, skipCache: Boolean, badUrl: Boolean = false) = {
+        <div>
+            <form action="/words" method="get">
+                <fieldset>
+                    <div>
+                        <label for="url">Site</label>
+                        <input type="text" id="url" name="url" value={ url } style="min-width: 300px;"></input>
+                        {
+                            if (badUrl) {
+                                <div style="font-color: red;">Invalid or missing URL</div>
+                            }
+                        }
+                    </div>
+                    <div>
+                        {
+                            <input type="checkbox" id="skipCache" name="skipCache"></input> %
+                                (if (skipCache) Attribute("checked", xml.Text(""), xml.Null) else xml.Null)
+                        }
+                        <label for="skipCache">Skip cache</label>
+                    </div>
+                    <div>
+                        <button>Spider &amp; Index</button>
+                    </div>
+                </fieldset>
+            </form>
+        </div>
+    }
+
+    private def results(url: String, index: Index, cacheHit: Boolean, elapsed: Long) = {
+        // world's ugliest word cloud!
+        def countToStyle(count: Int) = {
+            val maxCount = (index.wordCounts.headOption map { _._2 }).getOrElse(1)
+            val font = 6 + ((count.doubleValue / maxCount.doubleValue) * 24).intValue
+            Attribute("style", xml.Text("font-size: " + font + "pt;"), xml.Null)
+        }
+
+        <div>
+            <p>
+                <a href={ url }>{ url }</a>
+                spidered and indexed.
+            </p>
+            <p>{ elapsed }ms elapsed.</p>
+            <p>{ index.links.size } links scraped.</p>
+            {
+                if (cacheHit)
+                    <p>Results were retrieved from cache.</p>
+                else
+                    <p>Results newly-spidered (not from cache).</p>
+            }
+        </div>
+        <h3>Word Counts</h3>
+        <div style="max-width: 600px; margin-left: 100px; margin-top: 20px; margin-bottom: 20px;">
+            {
+                val nodes = xml.NodeSeq.newBuilder
+                for ((word, count) <- index.wordCounts) {
+                    nodes += <span title={ count.toString }>{ word }</span> % countToStyle(count)
+                    nodes += xml.Text(" ")
+                }
+                nodes.result
+            }
+        </div>
+        <div style="font-size: small">(hover to see counts)</div>
+        <h3>Links Found</h3>
+        <div style="margin-left: 50px;">
+            <ol>
+                {
+                    val nodes = xml.NodeSeq.newBuilder
+                    for ((text, url) <- index.links)
+                        nodes += <li><a href={ url }>{ text }</a></li>
+                    nodes.result
+                }
+            </ol>
+        </div>
+    }
+
+    def wordsPage(formNode: xml.NodeSeq, resultsNode: xml.NodeSeq) = {
+        <html>
+            <head>
+                <title>Web Words!</title>
+            </head>
+            <body style="max-width: 800px;">
+                <div>
+                    <div>
+                        { formNode }
+                    </div>
+                    {
+                        if (resultsNode.nonEmpty)
+                            <div>
+                                { resultsNode }
+                            </div>
+                    }
+                </div>
+            </body>
+        </html>
+    }
+
+    private def completeWithHtml(request: RequestMethod, html: xml.NodeSeq) = {
+        request.response.setContentType("text/html")
+        request.response.setCharacterEncoding("utf-8")
+        request.OK("<!DOCTYPE html>\n" + html)
+    }
+
     private def handleFinish(finish: Finish) = {
         val elapsed = System.currentTimeMillis - finish.startTime
         finish match {
             case Finish(request, url, Some(index), cacheHit, startTime) =>
-                // world's ugliest word cloud!
-                def countToStyle(count: Int) = {
-                    val maxCount = (index.wordCounts.headOption map { _._2 }).getOrElse(1)
-                    val font = 6 + ((count.doubleValue / maxCount.doubleValue) * 24).intValue
-                    Attribute("style", xml.Text("font-size: " + font + "pt;"), xml.Null)
-                }
+                val html = wordsPage(form(url, false), results(url, index, cacheHit, elapsed))
 
-                val html =
-                    <html>
-                        <head>
-                            <title>Web Words!</title>
-                        </head>
-                        <body style="max-width: 800px;">
-                            <div>
-                                <div>
-                                    <p>
-                                        <a href={ url }>{ url }</a>
-                                        spidered and indexed.
-                                    </p>
-                                    <p>{ elapsed }ms elapsed.</p>
-                                    <p>{ index.links.size } links scraped.</p>
-                                    {
-                                        if (cacheHit)
-                                            <p>Results were retrieved from cache.</p>
-                                        else
-                                            <p>Results newly-spidered (not from cache).</p>
-                                    }
-                                </div>
-                                <h3>Word Counts</h3>
-                                <div style="max-width: 600px; margin-left: 100px; margin-top: 20px; margin-bottom: 20px;">
-                                    {
-                                        val nodes = xml.NodeSeq.newBuilder
-                                        for ((word, count) <- index.wordCounts) {
-                                            nodes += <span title={ count.toString }>{ word }</span> % countToStyle(count)
-                                            nodes += xml.Text(" ")
-                                        }
-                                        nodes.result
-                                    }
-                                </div>
-                                <div style="font-size: small">(hover to see counts)</div>
-                                <h3>Links Found</h3>
-                                <div style="margin-left: 50px;">
-                                    <ol>
-                                        {
-                                            val nodes = xml.NodeSeq.newBuilder
-                                            for ((text, url) <- index.links)
-                                                nodes += <li><a href={ url }>{ text }</a></li>
-                                            nodes.result
-                                        }
-                                    </ol>
-                                </div>
-                            </div>
-                        </body>
-                    </html>
+                completeWithHtml(request, html)
 
-                request.response.setContentType("text/html")
-                request.response.setCharacterEncoding("utf-8")
-                request.OK("<!DOCTYPE html>\n" + html)
             case Finish(request, url, None, cacheHit, startTime) =>
                 request.OK("Failed to index url in " + elapsed + "ms (try reloading)")
         }
     }
 
-    private def handleGet(get: RequestMethod) = {
-        val skipCache = Option(get.request.getParameter("skipCache")).getOrElse("false") == "true"
-        val url = Option(get.request.getParameter("url")) flatMap { string =>
-            try {
-                Some(new URL(string))
-            } catch {
-                case e: MalformedURLException =>
-                    None
-            }
+    private def parseURL(s: String): Option[URL] = {
+        val maybe = try {
+            new URI(s) // we want it to be a valid URI also
+            Some(new URL(s))
+        } catch {
+            case e: MalformedURLException => None
+            case e: URISyntaxException => None
         }
+        maybe.orElse({
+            if (s.startsWith("http"))
+                None
+            else
+                parseURL("http://" + s)
+        })
+    }
 
-        val response = get.response
+    private def handleGet(get: RequestMethod) = {
+        val skipCacheStr = Option(get.request.getParameter("skipCache")).getOrElse("false")
+        val skipCache = Seq("true", "on", "checked").contains(skipCacheStr.toLowerCase)
+        val urlStr = Option(get.request.getParameter("url"))
+        val url = parseURL(urlStr.getOrElse(""))
 
         if (url.isDefined) {
             val startTime = System.currentTimeMillis
@@ -135,7 +194,10 @@ class WordsActor(config: WebWordsConfig) extends Actor {
                 self ! Finish(get, url.get.toExternalForm, index = None, cacheHit = false, startTime = startTime)
             }
         } else {
-            get.BadRequest("Invalid or missing url parameter")
+            val html = wordsPage(form(urlStr.getOrElse(""), skipCache, badUrl = urlStr.isDefined),
+                resultsNode = xml.NodeSeq.Empty)
+
+            completeWithHtml(get, html)
         }
     }
 
