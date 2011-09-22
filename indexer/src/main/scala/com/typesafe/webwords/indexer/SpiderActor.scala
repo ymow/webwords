@@ -53,6 +53,7 @@ object SpiderActor {
         fetched map { result =>
             result match {
                 case URLFetched(status, headers, body) if status == 200 =>
+                    // FIXME should probably filter out non-HTML content types
                     body
                 case URLFetched(status, headers, body) =>
                     throw new Exception("Failed to fetch, status: " + status)
