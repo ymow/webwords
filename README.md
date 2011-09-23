@@ -29,7 +29,7 @@ You can also run it locally, of course.
 
 If you follow an incoming request to the app, here's what the app
 shows you:
- 
+
  - an **embedded Jetty** HTTP server receives requests to spider sites
      - http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty
  - requests are forwarded to **Akka HTTP**, which uses Jetty Continuations
@@ -93,6 +93,7 @@ The build for the app illustrates:
     - `heroku addons:add mongohq`
     - `heroku addons:add rabbitmq`
     - `git push heroku master`
+    - `heroku scale web=1 indexer=1`
     - `heroku open`
 
 ## Enjoy
