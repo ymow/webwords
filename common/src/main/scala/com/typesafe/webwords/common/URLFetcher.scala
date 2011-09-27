@@ -22,16 +22,12 @@ class URLFetcher extends Actor {
 
     private val asyncHttpClient = URLFetcher.makeClient
 
-    private def handleIncoming(incoming: URLFetcherIncoming): Future[URLFetcherOutgoing] = {
-        incoming match {
-            case FetchURL(u) =>
-                URLFetcher.fetchURL(asyncHttpClient, u)
-        }
-    }
-
     override def receive = {
         case incoming: URLFetcherIncoming => {
-            val f = handleIncoming(incoming)
+            val f = incoming match {
+                case FetchURL(u) =>
+                    URLFetcher.fetchURL(asyncHttpClient, u)
+            }
 
             self.channel.replyWith(f)
         }
