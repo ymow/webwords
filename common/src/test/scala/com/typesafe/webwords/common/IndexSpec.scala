@@ -5,7 +5,7 @@ import org.scalatest._
 import akka.actor._
 
 class IndexSpec extends FlatSpec with ShouldMatchers {
-    private val sampleIndex = new Index(
+    private val sampleIndex = Index(
         links = Seq(
             "dogs" -> "http://dogs.com/",
             "cats" -> "http://cats.com/"),
@@ -14,8 +14,8 @@ class IndexSpec extends FlatSpec with ShouldMatchers {
             "world" -> 5,
             "quick" -> 4,
             "brown" -> 3))
-    private val copyOfSampleIndex = new Index(links = sampleIndex.links, wordCounts = sampleIndex.wordCounts)
-    private val sampleIndexDifferentOrder = new Index(
+    private val copyOfSampleIndex = Index(links = sampleIndex.links, wordCounts = sampleIndex.wordCounts)
+    private val sampleIndexDifferentOrder = Index(
         links = Seq(
             "cats" -> "http://cats.com/",
             "dogs" -> "http://dogs.com/"),
@@ -24,7 +24,7 @@ class IndexSpec extends FlatSpec with ShouldMatchers {
             "hello" -> 10,
             "brown" -> 3,
             "quick" -> 4))
-    private val emptyIndex = new Index(Nil, Nil)
+    private val emptyIndex = Index(Nil, Nil)
 
     behavior of "Index"
 

@@ -259,7 +259,7 @@ object IndexStorageActor {
             }
         }
 
-        new Index(links, wordCounts)
+        Index(links, wordCounts)
     }
 
     private[common] case class MongoURIParts(user: Option[String], password: Option[String],

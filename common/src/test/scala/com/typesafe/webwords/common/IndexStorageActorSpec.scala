@@ -6,7 +6,7 @@ import akka.actor._
 import java.net.URL
 
 class IndexStorageActorSpec extends FlatSpec with ShouldMatchers {
-    private val sampleIndex = new Index(
+    private val sampleIndex = Index(
         links = Seq(
             "dogs" -> "http://dogs.com/",
             "cats" -> "http://cats.com/"),
@@ -15,7 +15,7 @@ class IndexStorageActorSpec extends FlatSpec with ShouldMatchers {
             "world" -> 5,
             "quick" -> 4,
             "brown" -> 3))
-    private val anotherIndex = new Index(
+    private val anotherIndex = Index(
         links = Seq(
             "pigs" -> "http://pigs.com/",
             "cows" -> "http://cows.com/"),
@@ -24,7 +24,7 @@ class IndexStorageActorSpec extends FlatSpec with ShouldMatchers {
             "world" -> 1,
             "quick" -> 4,
             "brown" -> 2))
-    private val emptyIndex = new Index(Nil, Nil)
+    private val emptyIndex = Index(Nil, Nil)
     private val exampleUrl = new URL("http://example.com/")
     private val exampleUrl2 = new URL("http://example2.com/")
 

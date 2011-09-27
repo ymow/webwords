@@ -134,7 +134,7 @@ object SpiderActor {
 
         // ideally we might combine and count length at the same time, but we'll live
         val counts = combineCounts(a.wordCounts, b.wordCounts).take(math.max(a.wordCounts.length, b.wordCounts.length))
-        new Index(links, counts)
+        Index(links, counts)
     }
 
     private def combineIndexes(indexes: TraversableOnce[Index]): Index = {
