@@ -1,9 +1,3 @@
-resolvers += {
-  val typesafeRepoUrl = new java.net.URL("http://repo.typesafe.com/typesafe/ivy-releases")
-  val pattern = Patterns(false, "[organisation]/[module]/[sbtversion]/[revision]/[type]s/[module](-[classifier])-[revision].[ext]")
-  Resolver.url("Typesafe Ivy Snapshot Repository", typesafeRepoUrl)(pattern)
-}
+resolvers += Classpaths.typesafeResolver
 
-libraryDependencies <<= (libraryDependencies, sbtVersion) { (deps, version) =>
-  deps :+ ("com.typesafe.startscript" %% "xsbt-start-script-plugin" % "0.2.0" extra("sbtversion" -> version))
-}
+addSbtPlugin("com.typesafe.startscript" % "xsbt-start-script-plugin" % "0.3.0")
