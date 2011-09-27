@@ -46,10 +46,10 @@ object AMQPCheck {
                     }
 
                 } finally {
-                    ignoreCloseException(channel.close())
+                    ignoreCloseException { channel.close() }
                 }
             } finally {
-                ignoreCloseException(connection.close())
+                ignoreCloseException { connection.close() }
             }
 
             true
@@ -73,7 +73,7 @@ object AMQPCheck {
             try {
                 channel.queueDeclarePassive(name)
             } finally {
-                ignoreCloseException(channel.close())
+                ignoreCloseException { channel.close() }
             }
 
             true
