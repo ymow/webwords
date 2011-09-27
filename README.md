@@ -63,7 +63,7 @@ shows you:
 
 The build for the app illustrates:
 
- - SBT 0.10
+ - SBT 0.11
     - https://github.com/harrah/xsbt/wiki/
  - xsbt-start-script-plugin (useful for Heroku deployment)
     - https://github.com/typesafehub/xsbt-start-script-plugin
