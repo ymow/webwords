@@ -44,7 +44,7 @@ class WebServer(config: WebWordsConfig) {
         handler.setContextPath("/")
         // AkkaMistServlet forwards requests to the rootEndpoint which
         // in turn forwards them to our bootstrap actor.
-        handler.addServlet(new ServletHolder(new AkkaMistServlet()), "/*");
+        handler.addServlet(new ServletHolder(new AkkaMistServlet()), "/*")
 
         server.setHandler(handler)
 
