@@ -47,6 +47,18 @@ class IndexerActorSpec extends FlatSpec with ShouldMatchers {
         counts should have size 2
     }
 
+    behavior of "mergeCounts"
+
+    it should "merge nonintersecting counts" in {
+        val result = IndexerActor.mergeCounts(Map("a" -> 3), Map("b" -> 4))
+        result should be(Map("a" -> 3, "b" -> 4))
+    }
+
+    it should "merge intersecting counts" in {
+        val result = IndexerActor.mergeCounts(Map("a" -> 3, "c" -> 7), Map("b" -> 4, "c" -> 5))
+        result should be(Map("a" -> 3, "b" -> 4, "c" -> 12))
+    }
+
     behavior of "IndexerActor"
 
     private def load(resource: String) = {

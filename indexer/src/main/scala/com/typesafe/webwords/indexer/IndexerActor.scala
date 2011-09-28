@@ -9,7 +9,7 @@ import java.net.URISyntaxException
 import java.net.MalformedURLException
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import scala.collection.parallel.ParSeq
+import scala.collection.parallel._
 import com.typesafe.webwords.common.Index
 
 sealed trait IndexerRequest
@@ -86,7 +86,6 @@ class IndexerActor
 object IndexerActor {
     private val notWordRegex = """\W""".r
 
-    // this is in the companion object for ease of unit testing
     private[indexer] def splitWords(s: String): ParSeq[String] = {
         // ".par" is the magic that gives us a parallel algorithm
         val lines = s.split("\\n").toSeq.par
@@ -96,16 +95,31 @@ object IndexerActor {
         words
     }
 
-    // this is in the companion object for ease of unit testing
+    private[indexer] def mergeCounts(a: Map[String, Int], b: Map[String, Int]): Map[String, Int] = {
+        val builder = Map.newBuilder[String, Int]
+        val (intersection, notInB) = a partition { kv => b.contains(kv._1) }
+        val notInA = b filter { kv => !a.contains(kv._1) }
+        for ((key, value) <- intersection.iterator) {
+            builder += (key -> (value + b.get(key).get))
+        }
+        builder ++= notInA
+        builder ++= notInB
+        builder.result
+    }
+
     private[indexer] def wordCount(words: ParSeq[String]) = {
-        words.foldLeft(Map.empty[String, Int])({ (sofar, word) =>
+        // using foldLeft avoids the need for mergeCounts,
+        // but foldLeft is inherently sequential.
+        // You'd have to benchmark to see which is faster.
+
+        words.aggregate(Map.empty[String, Int])({ (sofar, word) =>
             sofar.get(word) match {
                 case Some(old) =>
                     sofar + (word -> (old + 1))
                 case None =>
                     sofar + (word -> 1)
             }
-        })
+        }, mergeCounts)
     }
 
     // not very scientific or internationalized ;-)
