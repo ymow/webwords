@@ -1,6 +1,15 @@
-An example Akka/Scala application ready to run on Heroku.
+Web Words, an example Akka/Scala application ready to run on Heroku.
 
 Created by Typesafe, http://typesafe.com/
+
+## See it live!
+
+A live demo of the Web Words app may be running at
+
+  http://radiant-winter-3539.herokuapp.com/
+
+If it's down, try again later, or deploy the app yourself! (See below for
+instructions.)
 
 ## Overview
 
@@ -94,6 +103,7 @@ The build for the app illustrates:
     - `heroku addons:add rabbitmq`
     - `git push heroku master`
     - `heroku scale web=1 indexer=1`
+    - `heroku restart`
     - `heroku open`
 
 ## Enjoy
