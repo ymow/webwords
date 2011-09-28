@@ -144,7 +144,7 @@ class WordsActor(config: WebWordsConfig) extends Actor {
         val elapsed = System.currentTimeMillis - finish.startTime
         finish match {
             case Finish(request, url, Some(index), cacheHit, startTime) =>
-                val html = wordsPage(form(url, false), results(url, index, cacheHit, elapsed))
+                val html = wordsPage(form(url, skipCache = false), results(url, index, cacheHit, elapsed))
 
                 completeWithHtml(request, html)
 
