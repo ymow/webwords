@@ -63,22 +63,18 @@ class ClientActor(config: WebWordsConfig) extends Actor {
 
 object ClientActor {
     private def getFromCacheOrElse(cache: ActorRef, url: String, cacheHit: Boolean)(fallback: => Future[GotIndex]): Future[GotIndex] = {
-        cache ? FetchCachedIndex(url) flatMap { fetched =>
-            fetched match {
-                case CachedIndexFetched(Some(index)) =>
-                    new AlreadyCompletedFuture(Right(GotIndex(url, Some(index), cacheHit)))
-                case CachedIndexFetched(None) =>
-                    fallback
-            }
+        cache ? FetchCachedIndex(url) flatMap {
+            case CachedIndexFetched(Some(index)) =>
+                new AlreadyCompletedFuture(Right(GotIndex(url, Some(index), cacheHit)))
+            case CachedIndexFetched(None) =>
+                fallback
         }
     }
 
     private def getFromWorker(client: ActorRef, url: String): Future[Unit] = {
-        client ? SpiderAndCache(url) map { spidered =>
-            spidered match {
-                case SpideredAndCached(returnedUrl) =>
-                    Unit
-            }
+        client ? SpiderAndCache(url) map {
+            case SpideredAndCached(returnedUrl) =>
+                Unit
         }
     }
 }

@@ -179,13 +179,11 @@ class WordsActor(config: WebWordsConfig) extends Actor {
             val startTime = System.currentTimeMillis
             val futureGotIndex = client ? GetIndex(url.get.toExternalForm, skipCache)
 
-            futureGotIndex foreach { reply =>
+            futureGotIndex foreach {
                 // now we're in another thread, so we just send ourselves
                 // a message, don't touch actor state
-                reply match {
-                    case GotIndex(url, indexOption, cacheHit) =>
-                        self ! Finish(get, url, indexOption, cacheHit, startTime)
-                }
+                case GotIndex(url, indexOption, cacheHit) =>
+                    self ! Finish(get, url, indexOption, cacheHit, startTime)
             }
 
             // we have to worry about timing out also.

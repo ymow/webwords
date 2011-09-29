@@ -116,13 +116,11 @@ class SpiderActorSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAl
     it should "spider from test http server" in {
         val url = httpServer.resolve("/resource/ToSpider.html")
         val spider = Actor.actorOf(new SpiderActor).start
-        val indexFuture = (spider ? Spider(url)) map { result =>
-            result match {
-                case Spidered(url, index) =>
-                    index
-                case _ =>
-                    throw new Exception("Got bad result from Spider: " + result)
-            }
+        val indexFuture = (spider ? Spider(url)) map {
+            case Spidered(url, index) =>
+                index
+            case whatever =>
+                throw new Exception("Got bad result from Spider: " + whatever)
         }
         val index = indexFuture.get
 

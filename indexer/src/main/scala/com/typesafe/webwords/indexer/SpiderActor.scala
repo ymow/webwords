@@ -51,27 +51,24 @@ class SpiderActor
 object SpiderActor {
     private def fetchBody(fetcher: ActorRef, url: URL): Future[String] = {
         val fetched = fetcher ? FetchURL(url)
-        fetched map { result =>
-            result match {
-                case URLFetched(status, headers, body) if status == 200 =>
-                    // FIXME should probably filter out non-HTML content types
-                    body
-                case URLFetched(status, headers, body) =>
-                    throw new Exception("Failed to fetch, status: " + status)
-                case _ =>
-                    throw new IllegalStateException("Unexpected reply to url fetch: " + result)
-            }
+        fetched map {
+            case URLFetched(status, headers, body) if status == 200 =>
+                // FIXME should probably filter out non-HTML content types
+                body
+            case URLFetched(status, headers, body) =>
+                throw new Exception("Failed to fetch, status: " + status)
+            case whatever =>
+                throw new IllegalStateException("Unexpected reply to url fetch: " + whatever)
         }
     }
 
     private def fetchIndex(indexer: ActorRef, fetcher: ActorRef, url: URL): Future[Index] = {
         fetchBody(fetcher, url) flatMap { body =>
             val indexed = indexer ? IndexHtml(url, body)
-            indexed map { result =>
-                result match {
-                    case IndexedHtml(index) =>
-                        index
-                }
+            indexed map {
+                case IndexedHtml(index) =>
+                    index
+
             }
         }
     }
