@@ -11,6 +11,13 @@ A live demo of the Web Words app may be running at
 If it's down, try again later, or deploy the app yourself! (See below for
 instructions.)
 
+## Article
+
+There's a related article [Scaling out with Scala and
+Akka](http://devcenter.heroku.com/articles/scaling-out-with-scala-and-akka)
+over on Heroku's Dev Center. The article is a guided tour of the Web Words
+code.
+
 ## Overview
 
 Unlike the usual "Hello, World" this example shows off quite a few
