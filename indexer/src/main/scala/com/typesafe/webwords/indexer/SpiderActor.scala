@@ -7,6 +7,7 @@ import java.net.URL
 import com.typesafe.webwords.common._
 
 import akka.actor.{ Index => _, _ }
+import akka.actor.Actor.actorOf
 import akka.dispatch._
 
 sealed trait SpiderRequest
@@ -27,8 +28,8 @@ case class Spidered(url: URL, index: Index)
  */
 class SpiderActor
     extends Actor {
-    private val indexer = Actor.actorOf(new IndexerActor)
-    private val fetcher = Actor.actorOf(new URLFetcher)
+    private val indexer = actorOf[IndexerActor]
+    private val fetcher = actorOf[URLFetcher]
 
     override def preStart() = {
         indexer.start

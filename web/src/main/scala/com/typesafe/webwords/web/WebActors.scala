@@ -4,6 +4,7 @@ import scala.collection.mutable
 import scala.xml
 import scala.xml.Attribute
 import akka.actor.{ Index => _, _ }
+import akka.actor.Actor.actorOf
 import akka.http._
 import com.typesafe.webwords.common._
 import java.net.URL
@@ -33,7 +34,7 @@ class Custom404Actor extends Actor {
 
 // this actor handles the main page.
 class WordsActor(config: WebWordsConfig) extends Actor {
-    private val client = Actor.actorOf(new ClientActor(config))
+    private val client = actorOf(new ClientActor(config))
 
     case class Finish(request: RequestMethod, url: String, index: Option[Index],
         cacheHit: Boolean, startTime: Long)
@@ -223,10 +224,10 @@ class WordsActor(config: WebWordsConfig) extends Actor {
 // but for this example, showing how you would do it manually.
 class WebBootstrap(rootEndpoint: ActorRef, config: WebWordsConfig) extends Actor with Endpoint {
     private val handlers = Map(
-        "/hello" -> Actor.actorOf[HelloActor],
-        "/words" -> Actor.actorOf(new WordsActor(config)))
+        "/hello" -> actorOf[HelloActor],
+        "/words" -> actorOf(new WordsActor(config)))
 
-    private val custom404 = Actor.actorOf[Custom404Actor]
+    private val custom404 = actorOf[Custom404Actor]
 
     // Caution: this callback does not run in the actor thread,
     // so has to be thread-safe. We keep it simple and only touch

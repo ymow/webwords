@@ -1,6 +1,7 @@
 package com.typesafe.webwords.indexer
 
 import akka.actor.{ Index => _, _ }
+import akka.actor.Actor.actorOf
 import akka.dispatch._
 import com.typesafe.webwords.common._
 import java.net.URL
@@ -11,8 +12,8 @@ import java.net.URL
  */
 class WorkerActor(config: WebWordsConfig)
     extends WorkQueueWorkerActor(config.amqpURL) {
-    private val spider = Actor.actorOf(new SpiderActor)
-    private val cache = Actor.actorOf(new IndexStorageActor(config.mongoURL))
+    private val spider = actorOf[SpiderActor]
+    private val cache = actorOf(new IndexStorageActor(config.mongoURL))
 
     override def handleRequest(request: WorkQueueRequest): Future[WorkQueueReply] = {
         request match {

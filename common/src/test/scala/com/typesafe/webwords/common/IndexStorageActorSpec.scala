@@ -3,6 +3,7 @@ package com.typesafe.webwords.common
 import org.scalatest.matchers._
 import org.scalatest._
 import akka.actor._
+import akka.actor.Actor.actorOf
 import java.net.URL
 
 class IndexStorageActorSpec extends FlatSpec with ShouldMatchers {
@@ -28,7 +29,7 @@ class IndexStorageActorSpec extends FlatSpec with ShouldMatchers {
     private val exampleUrl = new URL("http://example.com/")
     private val exampleUrl2 = new URL("http://example2.com/")
 
-    private def newActor = Actor.actorOf(new IndexStorageActor(Some("mongodb://localhost/webwordstest"))).start
+    private def newActor = actorOf(new IndexStorageActor(Some("mongodb://localhost/webwordstest"))).start
 
     behavior of "IndexStorageActor"
 

@@ -2,6 +2,7 @@ package com.typesafe.webwords.indexer
 
 import scala.collection.JavaConverters._
 import akka.actor.{ Index => _, _ }
+import akka.actor.Actor.actorOf
 import com.typesafe.webwords.common.CPUBoundActorPool
 import java.net.URL
 import java.net.URI
@@ -28,7 +29,8 @@ class IndexerActor
     extends Actor
     with CPUBoundActorPool {
 
-    override def instance = Actor.actorOf(new Worker())
+    // actorOf[Worker] doesn't work on nested classes
+    override def instance = actorOf(new Worker)
 
     override def receive = _route
 

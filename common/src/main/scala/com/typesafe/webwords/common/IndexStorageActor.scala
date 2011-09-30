@@ -2,6 +2,7 @@ package com.typesafe.webwords.common
 
 import scala.collection.JavaConverters._
 import akka.actor.{ Index => _, _ }
+import akka.actor.Actor.actorOf
 import java.net.URL
 import com.mongodb.casbah.MongoConnection
 import com.mongodb.casbah.MongoDB
@@ -94,7 +95,7 @@ class IndexStorageActor(mongoURI: Option[String])
         }
     }
 
-    override def instance = Actor.actorOf(new Worker(cache.get))
+    override def instance = actorOf(new Worker(cache.get))
 
     override def receive = {
         case DropCache =>

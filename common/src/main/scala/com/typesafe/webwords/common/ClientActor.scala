@@ -3,6 +3,7 @@ package com.typesafe.webwords.common
 import java.net.URL
 
 import akka.actor.{ Index => _, _ }
+import akka.actor.Actor.actorOf
 import akka.dispatch._
 
 sealed trait ClientActorIncoming
@@ -22,8 +23,8 @@ case class GotIndex(url: String, index: Option[Index], cacheHit: Boolean) extend
 class ClientActor(config: WebWordsConfig) extends Actor {
     import ClientActor._
 
-    private val client = Actor.actorOf(new WorkQueueClientActor(config.amqpURL))
-    private val cache = Actor.actorOf(new IndexStorageActor(config.mongoURL))
+    private val client = actorOf(new WorkQueueClientActor(config.amqpURL))
+    private val cache = actorOf(new IndexStorageActor(config.mongoURL))
 
     override def receive = {
         case incoming: ClientActorIncoming =>

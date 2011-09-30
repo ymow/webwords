@@ -1,6 +1,7 @@
 package com.typesafe.webwords.indexer
 
 import akka.actor._
+import akka.actor.Actor.actorOf
 import com.typesafe.webwords.common._
 import java.util.concurrent.CountDownLatch
 import com.typesafe.webwords.common.AMQPCheck
@@ -16,7 +17,7 @@ object Main extends App {
     if (!AMQPCheck.check(config))
         throw new Exception("AMQP not working (start the AMQP service?)")
 
-    val worker = Actor.actorOf(new WorkerActor(config))
+    val worker = actorOf(new WorkerActor(config))
 
     worker.start
 

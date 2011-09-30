@@ -3,7 +3,8 @@ package com.typesafe.webwords.indexer
 import org.scalatest.matchers._
 import org.scalatest._
 import scala.io.Source
-import akka.actor.Actor
+import akka.actor._
+import akka.actor.Actor.actorOf
 import java.net.URL
 
 class IndexerActorSpec extends FlatSpec with ShouldMatchers {
@@ -84,7 +85,7 @@ class IndexerActorSpec extends FlatSpec with ShouldMatchers {
 
     it should "index some sample HTML" in {
         val html = load("Functional_programming.html")
-        val indexer = Actor.actorOf(new IndexerActor).start
+        val indexer = actorOf[IndexerActor].start
         val result = (indexer ? IndexHtml(new URL("http://en.wikipedia.org/wiki/"), html)).as[IndexedHtml].get
         result.index.links.size should be(593)
         result.index.wordCounts.toSeq should be(wordsInSamples("Functional_programming.html"))
@@ -92,7 +93,7 @@ class IndexerActorSpec extends FlatSpec with ShouldMatchers {
 
     it should "index a lot of HTML concurrently" in {
         val html = load("Functional_programming.html")
-        val indexer = Actor.actorOf(new IndexerActor).start
+        val indexer = actorOf[IndexerActor].start
         val futures = for (i <- 1 to 20)
             yield indexer ? IndexHtml(new URL("http://en.wikipedia.org/wiki/"), html)
         for (f <- futures) {

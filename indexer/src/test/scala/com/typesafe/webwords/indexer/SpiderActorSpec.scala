@@ -3,6 +3,7 @@ package com.typesafe.webwords.indexer
 import org.scalatest.matchers._
 import org.scalatest._
 import akka.actor.{ Index => _, _ }
+import akka.actor.Actor.actorOf
 import java.net.URL
 import com.typesafe.webwords.common._
 import java.net.URI
@@ -23,7 +24,7 @@ class SpiderActorSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAl
     behavior of "local http server used to test spider"
 
     it should "fetch our test resource" in {
-        val fetcher = Actor.actorOf(new URLFetcher).start
+        val fetcher = actorOf[URLFetcher].start
         val f = fetcher ? FetchURL(httpServer.resolve("/resource/Functional_programming.html"))
         f.get match {
             case URLFetched(status, headers, body) =>
@@ -115,7 +116,7 @@ class SpiderActorSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAl
 
     it should "spider from test http server" in {
         val url = httpServer.resolve("/resource/ToSpider.html")
-        val spider = Actor.actorOf(new SpiderActor).start
+        val spider = actorOf[SpiderActor].start
         val indexFuture = (spider ? Spider(url)) map {
             case Spidered(url, index) =>
                 index

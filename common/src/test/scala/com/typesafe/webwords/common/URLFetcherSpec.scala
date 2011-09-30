@@ -6,6 +6,7 @@ import org.scalatest.matchers._
 import org.scalatest._
 
 import akka.actor._
+import akka.actor.Actor.actorOf
 
 import javax.servlet.http.HttpServletResponse
 
@@ -25,7 +26,7 @@ class URLFetcherSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAll
     }
 
     it should "fetch an url" in {
-        val fetcher = Actor.actorOf(new URLFetcher).start
+        val fetcher = actorOf(new URLFetcher).start
         val f = fetcher ? FetchURL(httpServer.resolve("/hello"))
         f.get match {
             case URLFetched(status, headers, body) =>
@@ -38,7 +39,7 @@ class URLFetcherSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAll
     }
 
     it should "handle a 404" in {
-        val fetcher = Actor.actorOf(new URLFetcher).start
+        val fetcher = actorOf(new URLFetcher).start
         val f = fetcher ? FetchURL(httpServer.resolve("/nothere"))
         f.get match {
             case URLFetched(status, headers, body) =>
@@ -53,7 +54,7 @@ class URLFetcherSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAll
         // the httpServer only has a fixed number of threads so if you make latency
         // or number of requests too high, the futures will start to time out
         httpServer.withRandomLatency(300) {
-            val fetcher = Actor.actorOf(new URLFetcher).start
+            val fetcher = actorOf(new URLFetcher).start
             val numToFetch = 500
             val responses = for (i <- 1 to numToFetch)
                 yield (fetcher ? FetchURL(httpServer.resolve("/echo", "what", i.toString)), i)

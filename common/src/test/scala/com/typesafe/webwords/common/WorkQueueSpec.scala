@@ -3,6 +3,7 @@ package com.typesafe.webwords.common
 import org.scalatest.matchers._
 import org.scalatest._
 import akka.actor._
+import akka.actor.Actor.actorOf
 import akka.dispatch._
 
 class WorkQueueSpec extends FlatSpec with ShouldMatchers {
@@ -61,12 +62,12 @@ class WorkQueueSpec extends FlatSpec with ShouldMatchers {
         // The worker side sets up the exchange, while the client
         // will throw errors if it isn't set up yet. So the
         // worker has to go first.
-        val worker = Actor.actorOf(new EchoWorker())
+        val worker = actorOf(new EchoWorker())
         worker.start
 
         Thread.sleep(500)
 
-        val client = Actor.actorOf(new WorkQueueClientActor())
+        val client = actorOf(new WorkQueueClientActor())
         client.start
 
         val url = "http://example.com/"

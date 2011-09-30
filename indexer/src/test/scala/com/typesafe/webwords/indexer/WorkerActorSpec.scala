@@ -3,6 +3,7 @@ package com.typesafe.webwords.indexer
 import org.scalatest.matchers._
 import org.scalatest._
 import akka.actor._
+import akka.actor.Actor.actorOf
 import java.net.URL
 import com.typesafe.webwords.common._
 
@@ -25,9 +26,9 @@ class WorkerActorSpec extends FlatSpec with ShouldMatchers with BeforeAndAfterAl
         val testdb = Some("mongodb://localhost/webwordsworkertest")
         val config = WebWordsConfig(None, testdb, None)
         val url = httpServer.resolve("/resource/ToSpider.html")
-        val worker = Actor.actorOf(new WorkerActor(config)).start
+        val worker = actorOf(new WorkerActor(config)).start
         Thread.sleep(500) // help ensure worker's amqp exchange is set up
-        val client = Actor.actorOf(new ClientActor(config)).start
+        val client = actorOf(new ClientActor(config)).start
         val indexFuture = (client ? GetIndex(url.toExternalForm, skipCache = false)) map {
             case GotIndex(url, Some(index), cacheHit) =>
                 index
