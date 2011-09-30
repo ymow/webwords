@@ -6,7 +6,7 @@ Created by Typesafe, http://typesafe.com/
 
 A live demo of the Web Words app may be running at
 
-  http://radiant-winter-3539.herokuapp.com/
+  http://webwords.herokuapp.com/
 
 If it's down, try again later, or deploy the app yourself! (See below for
 instructions.)
