@@ -9,6 +9,7 @@ import com.typesafe.webwords.common._
 import akka.actor.{ Index => _, _ }
 import akka.actor.Actor.actorOf
 import akka.dispatch._
+import akka.event.EventHandler
 
 sealed trait SpiderRequest
 case class Spider(url: URL) extends SpiderRequest
@@ -52,7 +53,10 @@ class SpiderActor
 object SpiderActor {
     private def fetchBody(fetcher: ActorRef, url: URL): Future[String] = {
         val fetched = fetcher ? FetchURL(url)
-        fetched map {
+        // there may be a cleaner solution here than returning an empty
+        // document on failure, but let's go with this for now
+        val bodyFuture = new DefaultCompletableFuture[String]
+        val maybeFailedFetch = fetched map {
             case URLFetched(status, headers, body) if status == 200 =>
                 // FIXME should probably filter out non-HTML content types
                 body
@@ -61,6 +65,14 @@ object SpiderActor {
             case whatever =>
                 throw new IllegalStateException("Unexpected reply to url fetch: " + whatever)
         }
+        maybeFailedFetch.onResult({ case x => bodyFuture.completeWithResult(x) })
+        maybeFailedFetch.onException({
+            case e =>
+                EventHandler.info(this, "Exception fetching '" + url + "': " + e.getClass.getSimpleName + ": " + e.getMessage)
+                // and just pretend we got an empty document.
+                bodyFuture.completeWithResult("")
+        })
+        bodyFuture
     }
 
     private def fetchIndex(indexer: ActorRef, fetcher: ActorRef, url: URL): Future[Index] = {
