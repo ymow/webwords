@@ -156,8 +156,12 @@ class WordsActor(config: WebWordsConfig) extends Actor {
 
     private def parseURL(s: String): Option[URL] = {
         val maybe = try {
-            new URI(s) // we want it to be a valid URI also
-            Some(new URL(s))
+            val uri = new URI(s) // we want it to be a valid URI also
+            val url = new URL(s)
+            // apparently a valid URI can have no hostname
+            if (uri.getHost() == null)
+                throw new URISyntaxException(s, "No host in URI")
+            Some(url)
         } catch {
             case e: MalformedURLException => None
             case e: URISyntaxException => None
